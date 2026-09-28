@@ -1,0 +1,190 @@
+这是本 Project（keyuan）memory 下的全部 4 个文件，内容为原文，已去掉工具附带的版本号和字节数等元数据。每个文件单独放在一个代码块里，复制时连同 frontmatter（`---` 之间的部分）一起带走。
+
+**文件 1：`overview.md`**
+
+```markdown
+---
+name: overview
+description: Carbon black foreign trade traineeship at 长鸿高科 — role, people, product and trade knowledge status, and current gaps
+sources: [backfill, chat]
+aliases: [长鸿高科, 605008.SH, 炭黑小组, 营销事业二部, carbon black team, management trainee]
+---
+
+## Role and placement
+
+- [stated] Xuzhe (高昫喆) is a 2026 management trainee (管培生) at Ningbo Changhong Polymer Scientific and Technical Inc. (长鸿高科, 605008.SH)
+- [stated] Placed in Marketing Division II (营销事业二部), foreign trade group, on the carbon black team (炭黑小组); carbon black is the primary product focus
+- [stated] Academic background: international management/business at University of Nottingham Ningbo China, graduating November 2026; undergraduate from De Montfort University Leicester
+- [stated] Strong English language skills; Ningbo local
+- [stated] Scope: active onboarding and learning phase, building toward independent order execution in foreign trade
+
+## Key personnel
+
+- [stated] 张晓敏 (Zhang Xiaoming) — direct mentor; senior colleague primarily responsible for carbon black; male — address and refer to him as 张师傅 (never 张姐)
+- [stated] 毛晓翔 (Mao Xiaoxiang / 毛经理) — oversees the entire foreign trade line including carbon black and PBT
+- [stated] 刘兴 (Liu Xing / 刘总) — deputy general manager of 营销事业二部; the designated 专业导师 (丙方) on the signed growth agreement, which requires at least one formal coaching session per month with a written record. Day-to-day teaching still comes from 张晓敏, who holds no role in the agreement
+- [stated] 洪顾问/洪老师 — senior advisor with significant informal authority over the management trainee program
+- [stated] Internal colleagues also referenced in the division: 亭全, 张明
+- [stated] A 新来的员工 (new as of late Sept 2026): same age as 刘总, previously worked at 杉杉
+
+## Compliance and structural context
+
+- [stated] Labor contract is signed with 长鸿高科 (the listed entity); external formal documents must not use "科元集团" identity — group structure and listed-company independence must be strictly distinguished
+- [stated] Carbon black external identity (Sept 2026 ruling): use 浙江长鸿生物材料有限公司 / Zhejiang Changhong Biological Material Co., Ltd in both Chinese and English customer-facing material (TDS, COA, quotations), not the Keyuan letterhead used in the English catalog
+- [stated] Marketing and procurement are priority lines for integrity compliance and audit oversight
+- [stated] The management trainee program is a first cohort, personally championed by the chairman; structurally real but unvalidated, with single-person dependency risk
+
+## Probation and milestones
+
+- [stated] Monthly work summaries required; probation concludes with a 答辩 (staged learning presentation, not pass/fail elimination)
+- [stated] The 双导师制 is built into the growth agreement itself — 专业导师 is 刘兴, with a separate 职业/生活导师 to be designated by HR; no separate 师徒协议 is outstanding
+- [stated] KPI targets from the growth agreement (成长协议): 5 overseas clients, 1 full order cycle — treated as a floor, not a ceiling
+- [stated] November 2026 diploma issuance is a procedural gap relative to employment start
+
+## Current state — product knowledge
+
+- [stated] Foundational onboarding across product knowledge and export trade fundamentals is complete; now in the gap-filling and operational execution phase
+- [stated] Deep familiarity with carbon black grades (N220, N326, N330, N550, N660), technical parameters (iodine adsorption, OAN/DBP, sieve residue), production bases (Ningbo, Shengzhou/嵊州, Fangchenggang), HS code 2803.00, and grade-to-application mapping
+- [stated] Completed knowledge modules on 长鸿高科 (SBS/SEBS/SEPS/SIS/SSBR/LCBR/ES), 浙江长鸿生物 (PBT/PBAT/PBS/THF/carbon black), and 广西长科 (SAN/ABS/MABS/HIPS/MS)
+- [stated] Modified PBT (改性PBT) is explicitly out of scope per supervisor instruction — do not raise GF30, NPFR, GRS, or TPEE-toughened grades unless specially directed
+
+## Current state — foreign trade knowledge
+
+- [stated] Completed: Incoterms (FOB/CIF/CFR/EXW/FCA), payment methods (T/T structures, L/C basics), a full 15-step order-follow-up manual anchored to a real SEBS order (Inabata/CH520), and a CIF carbon black simulation (Vietnamese buyer scenario)
+- [stated] Completed: pricing ladder calculations (ex-factory → EXW → FOB → CFR → CIF), cost spreadsheet logic, VAT rebate recovery in pricing
+- [stated] Completed (11 Sept): five-round quality-complaint handling simulation on the Vietnam N330 trial order plus a typhoon-delay branch (分支 4B); an 8-day onboarding learning summary (9/2–9/11, Word) was compiled as monthly-summary / 答辩 material
+- [stated] Completed (15 Sept): the full usance L/C simulation (模拟第三波 — 审证/改证/制单挑错/交单收汇, Bangladesh N550 scenario, L/C at 30 days after B/L date); outputs kept as monthly-summary / 答辩 material: 复盘 PDF 炭黑远期信用证模拟复盘_孟加拉N550.pdf and a 制单核对表 Excel tool. A Sinosure (中信保) high-risk payment-combination simulation is the remaining unstarted export-trade simulation
+- [stated] Completed (16 Sept): the B/L control-risk case study (Vietnam N330 trial order, 30% advance + 70% T/T against copy B/L, buyer stalling at the destination port), covering original/telex/sea waybill/copy distinctions, straight vs. order B/L, MBL vs. HBL, and the demurrage decision point; output kept as 答辩 / monthly-summary material (BL货权风险案例_越南N330_凭副本付款, .md and PDF). This closes the B/L gap below; cost calculation spreadsheet and chemical export compliance remain
+- [stated] Identified knowledge gaps per the growth agreement phase 3 assessment: complete cost calculation spreadsheet execution, B/L form distinctions and payment term risk (70% against copy B/L), and chemical export compliance (REACH/TSCA/K-REACH for carbon black)
+
+## Current state — market intelligence
+
+- [stated] Completed anti-dumping and market research: India (AD expired 2020; BIS/QCO risk pending), US (Section 301 25% tariff on HTS 2803.00.00 in force), EU (no AD on Chinese carbon black; REACH required; opportunity from the 2024 Russian/Belarusian import ban), Turkey (additional customs duty applicability under GTİP 2803 pending verification), Southeast Asia (near-zero tariffs under RCEP with Form E)
+- [stated] Development scope ruling from 张晓敏 (Sept 2026): do not develop Chinese-invested (中资) tire plants overseas — they do not purchase locally; the route in is via the domestic China business line first, then the group's overseas plants. Applies beyond Vietnam
+
+## On the horizon
+
+- [stated] Close the three highest-priority knowledge gaps from the phase 3 growth agreement assessment: cost calculation spreadsheet, B/L risk mechanics, and carbon black export compliance frameworks
+- [stated] Clarify with Zhang Xiaoming: standard FOB port surcharge inclusions, whether the company accepts EXW, standard insurance company and coverage type, seller's interest insurance for FOB + deferred payment, and the standard quotation template terms
+- [stated] Confirm with internal contacts: which spec sheet governs external quotation for sieve residue (TDS ≤500 vs. internal control ≤300), S/Z suffix COA variants, N8306 grade identity, COA issuing entity vs. actual production origin for Guangxi N550 batches, and the internal contract approval channel
+- [stated] Verify Turkey additional customs duty (GTİP 2803)
+
+## Live quoting (from mid-Sept 2026)
+
+- [stated] Carbon black pricing task for 胡总 (16 Sept): quotes for N220/N326/N330/N550/N660 on two bases — RMB delivered to 青岛森麒麟 (tire plant, Qingdao; 陆运 32吨/车) and USD FOB 钦州港 (40HQ loads 20 t); a 40HQ carbon black shipment 钦州→Yangon (Myanmar), PIL/ONE, end-Sept sailing, was being freight-checked on 18 Sept
+
+## Customer development practice (from 20 Sept 2026)
+
+- [stated] Working through a from-zero, stage-by-stage customer development walkthrough on one Vietnamese target, in its own chat split off from 系统化客户开发方法; the target is Cao su Thống Nhất / Ruthimex (THONG NHAT RUBBER COMPANY LIMITED, HCMC, buyer tax code 0300770151), whose HS 2803 import records he pulled from 环球慧思. Treated as pure practice (纯当练手) with no internal 报备 at the research stage
+- [stated] Second Vietnamese target under assessment (20 Sept 2026): Cao su Sao Vàng / Sao Vang Rubber JSC (SRC, src.com.vn, Hà Nội); he pulled its HS 2803 import records from 环球慧思 by buyer tax code 0100100625 (61 records, 2024-01 to 2026-08) and is exporting them for analysis. In the platform's 海关编码 field the code goes in as digits only (2803, no "HS" prefix)
+- [stated] First live outreach (21 Sept 2026): cold email from his Gmail to DRC / Da Nang Rubber JSC (drc.com.vn) via its general office mailbox, pitching N330/N660; it was routed to the materials & import-export department (vattu@drc.com.vn), whose head Nguyễn Ngọc Bình (ngocbinh@drc.com.vn) assigned a buyer named Vi to contact him
+- [stated] 张晓敏's market steer for carbon black development (21 Sept 2026): Vietnam — the company already has a few customers, more can be developed; Thailand — blank market, can develop; Indonesia — covered by an existing agent, no rush to develop; Cambodia — one existing customer is a Chinese domestic tire maker with a factory there, otherwise blank
+- [stated] Second live outreach batch (22 Sept 2026): tailored cold emails to five Vietnamese prospects — Inoue Rubber Vietnam, Mega Vietnam General Business, Nguyễn Phát (hoachatnguyenphat.com.vn), Tân Đông Dương (TDD, tdd.vn) and 75 Rubber (Cao su 75, 75rubber@gmail.com); registered as nos. 2–6 in his 客户跟进表格 after DRC; no replies yet as of 22 Sept
+- [stated] 75 Rubber has a military-industry (军工) background; 张师傅 cleared developing it, and Xuzhe would welcome it as a long-term, stable customer
+- [stated] Third live outreach batch (23 Sept 2026, Thailand): tailored cold emails sent from his Gmail to five prospects — Siam Luck Trading (siamluck.co.th, Bangkok chemical distributor, to Pornwipa), Otani Tire (otanitire.com, to boonmee@), PN Inter Corporation (pnic.co.th, Himadri's Thai distributor, to Namthip), S.R. Tyres (srtyres.com, Prachinburi, via info@) and Pongpara Rubber (pongpara.co.th, automotive seals/hoses, via sales@); no replies yet as of 23 Sept
+- [stated] Fourth outreach batch (28 Sept 2026): 8 cold emails counted as developments and registered in his 客户跟进表格 — Casumina (Vietnam), Chin Lan Shing Rubber (Vietnam plant and Taiwan HQ, counted as two), Vu Huy (handtool.vn), Sun Hua Sealing / Essons (Vĩnh Phúc), Green PVC Additives (via the Nhat Huy group mailbox), Kato Sansho (Japan HQ, for its Vietnam arm KASANAM) and Daito Rubber (Japan HQ, for its Hai Phong plant); a ninth email to Essons' Taiwan HQ bounced and is not counted
+```
+
+**文件 2：`ways-of-working.md`**
+
+```markdown
+---
+name: ways-of-working
+description: Learning format, output preferences, weekly rhythm, escalation principles, and research tools for the carbon black traineeship
+sources: [backfill, chat]
+aliases: [三单一致, 成长协议, growth agreement]
+---
+
+## Weekly rhythm
+
+- [stated] Foreign trade group meeting every Sunday evening at 20:00 — oral summary of the week's transactions and difficulties, followed by a brief written report (成交品名+牌号+吨位 / 下周计划 / client-by-client tracking with product, quote, target price, attitude, next step); one team member rotates weekly to write the full group summary
+- [stated] Currently observer only at the Sunday meeting — listens but does not present
+- [stated] Management trainee tracking regime (科元控股字〔2026〕042号《管培生培养常态跟踪服务实施办法》, issued 20 Sept 2026): daily work log kept in a paper notebook; 《管培生月度考核评价表》 filed by the 5th of each month covering the prior month — mentor-scored, routed via 综合管理部 to group HR for 备案; quarterly 成长分享例会; stage assessments (《管培生阶段性考评鉴定表》) must be initiated by the trainee himself and passed before advancing to the next phase; a cross-base 管培生培养常态群 is run by group HR
+- [stated] Daily work log format (handwritten in the paper notebook, meant to take ~5 minutes): date line, then five fixed columns — 【做】what was done (facts only, no evaluation) / 【学】specific reusable knowledge points / 【卡】what was unclear or stuck and how it was resolved / 【人】who taught him, who he communicated with and about what / 【明】tomorrow's plan
+
+## Learning and document preferences
+
+- [stated] Learning format: structured, layered notes built across sessions, annotated with confidence/source tags — 【通】industry standard, 【司】company-specific, 【待确认】/【待补】unverified items pending internal confirmation
+- [stated] Visual preference: SVG diagrams, comparison tables, and plain-language analogies are consistently effective (e.g. bricks/springs for hard/soft segments, pricing ladder tables)
+- [stated] Uses a four-question sales framework for every product: what it is / what customers use it for / what customers evaluate / why buy from this company
+- [stated] Prefers comprehensive reference documents (Word/PDF, A4, CJK-font embedded) as study artifacts for later review
+- [stated] Communication drafting is calibrated for impression management and sequencing, not just content — separate messages to different recipients with deliberate framing
+- [stated] Pending-item discipline: consolidates open questions into batched requests to supervisors rather than ad hoc queries
+
+## Operating principles
+
+- [stated] Escalate before engaging clients on risk: do not negotiate risky payment/shipping combinations (especially FOB + nominated freight forwarder + deferred T/T) without management approval; credit decisions are governed by Sinosure approval, not relationship quality
+- [stated] Relationship exceptions don't override controls: client nationality-linked commercial behaviors should be investigated for structural causes (insurance policy requirements, open cover arrangements) rather than attributed to personal character
+- [stated] Execution before confirmation is a recurring risk — the instinct to jump to execution details before internal approval is flagged as a habit to manage
+- [stated] Three-document consistency (三单一致) is a core discipline for order follow-up
+- [stated] Information compartmentalization: do not discuss compensation or the relationship with 洪顾问 with colleagues; deflect salary questions with "够用" framing that emphasizes obligations over privileges
+- [stated] KPI targets are a floor: the growth agreement targets (5 clients, 1 order cycle) should be exceeded rather than met minimally
+- [stated] Program dependency risk: the trainee program depends heavily on a single person with no institutional succession — building contractual achievements and client relationships provides independent career value
+- [stated] 张师父's ruling (Sept 2026) on Chinese-invested (中资) tire plants overseas: don't develop them — they won't purchase directly; the way in is to win the group's domestic China plant first, then develop its overseas plants in sync. Wait until the domestic side is established.
+- [stated] 张师傅's pricing approach for new prospects (Sept 2026): before the customer has confirmed quality, quoting low is fine — customers don't buy straight away, so a low price opens contact and a sample trial, and a normal price is quoted when they actually purchase; carbon black prices fluctuate anyway
+- [stated] 张师傅 requires every customer he has contacted to be registered and graded (A–E) in the team's 客户跟进表格 template, with dated follow-ups logged on each customer's own numbered sheet
+- [stated] 毛师傅 (毛晓翔) steer (late Sept 2026): favour broad outreach (广撒网) over deep per-prospect development (精开发) — don't spend much time querying data in 环球慧思 or OKKI
+
+## Research methodology and sources
+
+- [stated] Country research methodology uses 中国贸易救济信息网 (cacs.mofcom.gov.cn), WTO I-TIP, ITC MacMap, 中国自由贸易区服务网, Access2Markets, USITC HTS tool + USTR 301; maintains a quarterly-updated country matrix
+- [stated] Market data sources: 生意社 (coal tar oil + N330 market prices), NCFI freight index, Brent crude for quoting logic
+- [stated] Credit insurance: Sinosure (中信保) governs credit approval for deferred payment terms
+- [stated] Customs data: has access to the 环球慧思 Globalwits trade information system (g6.globalwits.cn), arranged through 张师傅 — used to pull importer/supplier/volume/price records by HS code and buyer tax code; an export can carry at most 12 fields, so fields have to be prioritised (or split across two exports)
+
+## Internal systems and tooling
+
+- [stated] Internal systems: OA/ERP (requires human action; Claude cannot access), WeChat for internal communication, company email gaoxz@kygroup.ltd (gaoxuzhe@keyuan.com was only a simulation address); first-touch prospect outreach goes out from his personal Gmail ish566002@gmail.com
+- [stated] PDF generation pipeline in the Claude project environment: pandoc → HTML5 with CSS → wkhtmltopdf (Noto Sans CJK SC) → pypdf + reportlab for page number overlay
+- [stated] File handling in this project: `.pdf` project files extract via `unzip`; `.docx` files are plain UTF-8 text; COA `.xls` requires the `xlrd` engine via pandas
+- [stated] Exchange rate API: `api.frankfurter.dev`
+- [stated] Plans (21 Sept 2026) a personal follow-up ledger run in Claude Code (Code mode) for customer follow-ups, inquiries and order tracking, to be added to as cases come up; asked for the prompt plus his memory context as one package to copy into CC
+
+## Terminology preference
+
+- [stated] Use "美元" or "USD" instead of "美金" when referring to US dollars, even if Xuzhe uses "美金" himself
+
+## Outreach email signature
+
+- [stated] From 28 Sept 2026, end every outreach email drafted for him with this sign-off, one item per line in this order (| marks a line break): Xuzhe (Batiste) Gao | Marketing Division II / Carbon Black | Keyuan Holding Group Co., Ltd. | ZHEJIANG CHANGHONG BIOLOGICAL MATERIAL CO., LTD., | Work Email: gaoxz@kygroup.ltd | Personal Email: ish566002@gmail.com | WhatsApp: +44 7536 287291 | Mobile: +86 15990233826
+```
+
+**文件 3：`areas/sales-incentive-policy.md`**
+
+```markdown
+---
+name: sales-incentive-policy
+description: 营销二部 sales incentive rules and sales-staff grade policy (approved Aug 2026, in trial) — commission formula, quarterly settlement for foreign trade, new-customer awards, grade/pay tiers and promotion rules; read for salary, KPI, promotion, probation or client-development questions
+sources: [chat]
+aliases: [销售激励细则, 职级管理办法, 提成, incentive policy]
+---
+
+- [stated] Two policies briefed to the foreign trade group in Sept 2026: 《营销事业二部销售激励细则》 and 《销售人员职级管理办法》, approved Aug 2026, in trial for one year and subject to revision
+- [stated] Pay structure: 基本工资（含保密补贴）+ 职务工资（by grade）+ 销售激励; other allowances per company policy; "固定工资标准有协议的按协议执行" — the policy leaves open how a fixed-pay agreement (such as a 成长协议) interacts with commission
+- [stated] Grade table (职务工资 RMB/month): 业务员 初级 2000 / 中级 3000; 销售主管（外贸主管）中级 5000 / 高级 6000; 产品销售经理（外贸经理）高级 6000–8000 / 资深 10000–15000 (managers get mid-level travel allowance). New hires are graded at 转正; no prior experience → 初级
+- [stated] Grade rules: annual review (own 年度总结 with quantified data → supervisor → 营销二部 discussion → group; manager results need chairman approval; effective next month). Promotion needs completion rate ≥80%, 初级 needs ≥1 year tenure, other levels ≥2 years; demotion at <50% or major sales problems; no promotion for 12 months after a major complaint / compliance breach; 破格 promotion possible with chairman approval. Evaluation weights for 业务员/主管: 业绩 50% plus 客户服务、团队贡献、销售技巧、沟通协作、工作态度. Position promotion (e.g. 业务员→主管) additionally requires 定岗定编 and a probation period
+- [stated] Commission = [Σ(sales volume × per-product commission rate) + 溢价提成] × plan-completion coefficient. Volume = 出库量 matched to actual payment received. Coefficient: ≥80% → 1; 50–80% → equals completion rate; <50% → 0. Foreign trade uses the quarterly TEAM coefficient and settles quarterly; strategy-driven shortfalls can be excused only with prior 营销二部 GM approval
+- [stated] Commission rates for 长鸿高科 / 长鸿生物 products are tiered by marginal contribution (C1→A2; 长鸿高科 A2 threshold 1346 = 固定制造费用 756 + 期间费用 380 + 利润目标 210; 溢价 = 边际贡献 − 1346). Carbon black is NOT on the marginal-contribution ladder — a flat RMB/ton rate (its 附表 not yet seen). 副牌 counted separately, scrap excluded; export FX at 国税 monthly average rate
+- [stated] Foreign-trade 溢价提成 = 10% of the domestic-vs-export monthly average price gap for the same product, positive and negative gaps netted, payable only if the quarterly target is met; trial for 3 months; the 10% rule's applicability to carbon black was left unclear in the briefing
+- [stated] New-customer development award: terminal customer (or sold via a trader to a terminal), defined as no deal record or >1 year inactive; needs ≥2 deals within 6 months; 100–3000 RMB per customer by best-month volume (the briefing transcript said 500–3000); strategic customers 6000–10000 RMB with 张总 approval; same customer under a different 抬头 does not count
+- [stated] New products: highest-tier commission rate for 6 months after launch. Related-party business (e.g. SSBR/LCBR between 长科 and 高科, modified asphalt to affiliates) earns no incentive but counts toward completion rate. Bad debts can trigger commission clawback. Annual excess-profit sharing pool if the budgeted profit target is exceeded
+- [stated] Distribution: product sales manager proposes monthly split by team contribution (non-volume contributions such as opening hard markets count) → 业务管理部 initial review → 刘总（分管领导）→ 张总（营销二部总经理）approves. 出库量 confirmed by base companies; cost data from base-company finance
+```
+
+**文件 4：`index.md`**（只有 frontmatter，没有正文，是否迁移都可以）
+
+```markdown
+---
+name: "keyuan"
+description: keyuan — Carbon black foreign trade traineeship at 长鸿高科 — product learning, order execution, market research.
+---
+```
+
+**迁移时建议顺手修正的几处问题**（我没有改旧文件，你决定是否在「科元2」里修正）：
+
+1. **拼音错误**：`张晓敏 (Zhang Xiaoming)` 这里写错了。「敏」读 mǐn，正确拼写是 **Zhang Xiaomin**。overview.md 中出现了两次，"Clarify with Zhang Xiaoming" 一句也要一起改。如果你以后要在英文邮件里提到他，这个拼写会直接用上。
+2. **状态自相矛盾**：16 Sept 那条已经写明 B/L gap 关闭了，但下面的 "Identified knowledge gaps" 和 "On the horizon" 两处仍把 B/L 列为待补。迁移时建议把 B/L 从这两处删掉，剩下成本核算表和化学品出口合规两项。
+3. **重复条目**：张师傅关于海外中资轮胎厂不开发的裁决，在 overview.md（Market intelligence 一节）和 ways-of-working.md（Operating principles 一节）各写了一遍。保留 ways-of-working 那条就够了。另外，ways-of-working 里一处写的是「张师父」，其他地方都是「张师傅」，建议统一。
+4. **学校名称**：overview.md 写的是 "University of Nottingham Ningbo China"，而 account-level 的 profile 写的是 University of Nottingham。你实际就读的是哪个校区，以你为准统一。
+
+还有一点：`/areas/keyuan-management-trainee.md`、`/areas/export-trade-course.md` 等文件属于 account-level memory，不在本 Project 的子目录下，所以没有列出。「科元2」能否读到这些文件，取决于该 Project 页面上的 memory 设置：如果设为与账户 memory 连通就能读到，不需要迁移；如果设为独立，就读不到，需要一并迁过去。
