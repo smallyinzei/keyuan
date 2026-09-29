@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>炭黑生产工艺流程</title>
+<style>
+/*@FONT_FACE@*/
+:root{
+  --font:"CBSans","Noto Sans SC","Source Han Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB","WenQuanYi Zen Hei",sans-serif;
+  --paper:#F4F5F2; --ink:#1E2328; --sub:#5B6470; --co:#B42318;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#101317;font-family:var(--font);color:var(--ink);overflow:hidden}
+#viewport{position:absolute;left:0;top:0;right:0;bottom:64px;overflow:hidden}
+body.render #viewport{bottom:0}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;
+  background-color:var(--paper);
+  background-image:linear-gradient(rgba(30,35,40,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(30,35,40,.045) 1px,transparent 1px);
+  background-size:40px 40px}
+.scene{position:absolute;inset:0;display:none}
+.scene>svg{position:absolute;left:0;top:0}
+.scene>.html{position:absolute;inset:0}
+svg text{font-family:var(--font)}
+sub{font-size:.62em;vertical-align:-.18em;line-height:0}
+
+/* 章节标题 */
+#chap{position:absolute;left:56px;top:38px;display:flex;align-items:center;gap:18px;z-index:5}
+#chap .num{min-width:80px;height:80px;border-radius:18px;color:#fff;font-weight:900;font-size:36px;display:flex;align-items:center;justify-content:center;padding:0 16px;letter-spacing:1px;box-shadow:0 6px 18px rgba(0,0,0,.14)}
+#chap .num.wide{font-size:30px}
+#chap .t{font-size:42px;font-weight:900;letter-spacing:1px;line-height:1.1}
+#chap .s{font-size:23px;color:var(--sub);margin-top:7px;font-weight:500;letter-spacing:.5px}
+#brand{position:absolute;right:56px;top:50px;font-size:21px;color:#8A929C;font-weight:500;letter-spacing:1px;z-index:5}
+#brand b{color:#5B6470;font-weight:700}
+
+/* 字幕 */
+#cap{position:absolute;left:0;right:0;bottom:30px;display:flex;justify-content:center;z-index:6;pointer-events:none}
+#cap span{display:inline-block;max-width:1660px;padding:14px 40px 16px;background:rgba(20,22,26,.86);color:#fff;font-size:42px;line-height:1.45;font-weight:500;border-radius:16px;text-align:center;text-wrap:balance;letter-spacing:.5px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+
+/* 进度条 */
+#prog{position:absolute;left:0;right:0;bottom:0;height:9px;display:flex;gap:3px;z-index:7;background:var(--paper)}
+.pseg{position:relative;background:color-mix(in srgb,var(--c) 22%,#fff);overflow:hidden}
+.pfill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--c)}
+
+/* 卡片与标签 */
+.card{position:absolute;background:#fff;border-radius:18px;padding:20px 26px 22px;box-shadow:0 14px 34px rgba(25,32,40,.14),0 0 0 1.5px rgba(25,32,40,.06);font-size:25px;line-height:1.5;color:var(--ink)}
+.card h4{margin:0 0 10px;font-size:29px;font-weight:900;display:flex;align-items:center;gap:12px;letter-spacing:.5px}
+.card ul{margin:0;padding-left:1.05em}
+.card li{margin:3px 0}
+.card li::marker{color:#98A2B3}
+.card .em{color:var(--co);font-weight:800}
+.card .muted{color:var(--sub);font-size:21px}
+.card table{border-collapse:collapse;width:100%;font-size:23px}
+.card th{font-weight:700;color:var(--sub);font-size:19px;text-align:left;padding:4px 10px 6px;border-bottom:2px solid #E4E7EC;white-space:nowrap}
+.card td{padding:6px 10px;border-bottom:1px solid #EEF0F3;white-space:nowrap}
+.card tr:last-child td{border-bottom:none}
+.tag{display:inline-block;font-size:18px;font-weight:800;padding:3px 11px;border-radius:8px;color:#fff;background:#475467;letter-spacing:1px;white-space:nowrap;line-height:1.4}
+.tag.co{background:var(--co)}
+.tag.cw{background:#1D4ED8}
+.tag.gen{background:#475467}
+.chip{display:inline-flex;align-items:center;padding:7px 20px;border-radius:999px;background:#fff;border:2.5px solid var(--c,#C8861B);color:var(--c,#8A5A0B);font-weight:800;font-size:25px;box-shadow:0 4px 12px rgba(0,0,0,.06);white-space:nowrap}
+.co-card{border-left:8px solid var(--co)}
+
+/* 片头 */
+.title-wrap{position:absolute;left:0;right:0;top:238px;text-align:center}
+.kicker{font-size:26px;letter-spacing:8px;color:#6B7480;font-weight:700}
+.title-wrap h1{margin:22px 0 0;font-size:112px;font-weight:900;letter-spacing:10px;line-height:1.1;color:var(--ink)}
+.subtitle{margin-top:22px;font-size:38px;color:#3E4650;font-weight:500;letter-spacing:3px}
+.schips{margin-top:54px;display:flex;justify-content:center;gap:18px}
+.schip{display:inline-flex;align-items:center;gap:10px;padding:10px 24px 10px 12px;border-radius:999px;background:#fff;font-size:28px;font-weight:800;color:var(--c);box-shadow:0 6px 18px rgba(0,0,0,.08),inset 0 0 0 2.5px var(--c)}
+.schip i{font-style:normal;width:40px;height:40px;border-radius:50%;background:var(--c);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:22px}
+.tfoot{position:absolute;left:0;right:0;bottom:92px;text-align:center;font-size:23px;color:#7A838E;letter-spacing:1px}
+
+/* 总览方块 */
+.blk{position:absolute;background:#fff;border-radius:22px;box-shadow:0 14px 34px rgba(25,32,40,.12),inset 0 0 0 3px var(--c);padding:18px 22px;text-align:center}
+.blk .bh{display:flex;align-items:center;justify-content:center;gap:12px;font-size:33px;font-weight:900;color:var(--c)}
+.blk .bn{width:44px;height:44px;border-radius:50%;background:var(--c);color:#fff;font-size:25px;display:inline-flex;align-items:center;justify-content:center}
+.blk .bi{height:92px;margin:10px 0 6px;display:flex;align-items:center;justify-content:center}
+.blk .bl{font-size:23px;color:#3E4650;font-weight:600;line-height:1.45}
+.blk.glow{box-shadow:0 18px 44px color-mix(in srgb,var(--c) 38%,transparent),inset 0 0 0 5px var(--c)}
+
+/* 回顾表 */
+.recap td:first-child{font-weight:800}
+.recap td{white-space:normal}
+
+/* 播放控件（仅浏览器交互模式） */
+#controls{position:fixed;left:0;right:0;bottom:0;height:64px;background:#171B20;display:flex;align-items:center;gap:14px;padding:0 18px;color:#D0D5DB;font-size:15px;border-top:1px solid #2A3038}
+body.render #controls{display:none}
+#controls button{background:#2A313A;color:#fff;border:0;border-radius:10px;height:40px;min-width:44px;font-size:17px;cursor:pointer;font-family:var(--font)}
+#controls button:hover{background:#36404B}
+#controls input[type=range]{flex:1;accent-color:#F08C00}
+#controls select{background:#2A313A;color:#fff;border:0;border-radius:10px;height:40px;padding:0 10px;font-family:var(--font);font-size:15px}
+#time{font-variant-numeric:tabular-nums;min-width:110px;text-align:center}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="steelV" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8C97A4"/><stop offset=".2" stop-color="#C5CDD6"/><stop offset=".46" stop-color="#EEF1F4"/><stop offset=".76" stop-color="#C1C9D2"/><stop offset="1" stop-color="#8A95A2"/>
+    </linearGradient>
+    <linearGradient id="steelH" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8C97A4"/><stop offset=".2" stop-color="#C5CDD6"/><stop offset=".46" stop-color="#EEF1F4"/><stop offset=".76" stop-color="#C1C9D2"/><stop offset="1" stop-color="#8A95A2"/>
+    </linearGradient>
+    <linearGradient id="steelDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5E6874"/><stop offset=".45" stop-color="#9AA5B1"/><stop offset="1" stop-color="#4E5762"/>
+    </linearGradient>
+    <radialGradient id="cbBall" cx=".36" cy=".32" r=".78">
+      <stop offset="0" stop-color="#74777D"/><stop offset=".32" stop-color="#2C2E33"/><stop offset="1" stop-color="#060607"/>
+    </radialGradient>
+    <radialGradient id="oilBall" cx=".35" cy=".32" r=".8">
+      <stop offset="0" stop-color="#FFE7AE"/><stop offset=".45" stop-color="#E3A33A"/><stop offset="1" stop-color="#94560A"/>
+    </radialGradient>
+    <linearGradient id="flameLin" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFF8DC"/><stop offset=".28" stop-color="#FFD166"/><stop offset=".68" stop-color="#F59F3A" stop-opacity=".9"/><stop offset="1" stop-color="#E4572E" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="flameUp" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#FFF8DC"/><stop offset=".3" stop-color="#FFD166"/><stop offset=".7" stop-color="#F59F3A" stop-opacity=".9"/><stop offset="1" stop-color="#E4572E" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="hotGlow" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#FFB347" stop-opacity=".55"/><stop offset="1" stop-color="#FFB347" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="bricks" width="36" height="18" patternUnits="userSpaceOnUse">
+      <rect width="36" height="18" fill="#C9A184"/>
+      <path d="M0 0.75H36M0 9.75H36M0.75 0V9M18.75 9V18" stroke="#9C7258" stroke-width="1.5" fill="none"/>
+    </pattern>
+    <pattern id="mesh" width="10" height="10" patternUnits="userSpaceOnUse">
+      <path d="M0 0L10 10M10 0L0 10" stroke="#7D8793" stroke-width="1.3"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="7" stdDeviation="8" flood-color="#1E2328" flood-opacity=".17"/>
+    </filter>
+    <filter id="blur6"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+</svg>
+
+<div id="viewport">
+  <div id="stage">
+    <div id="scenes"></div>
+    <div id="chap"><div class="num">01</div><div><div class="t"></div><div class="s"></div></div></div>
+    <div id="brand"><b>炭黑生产工艺流程</b> · 内部学习资料</div>
+    <div id="cap"><span></span></div>
+    <div id="prog"></div>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="play" title="播放/暂停（空格）">▶</button>
+  <button id="restart" title="从头播放">⟲</button>
+  <span id="time">0:00 / 0:00</span>
+  <input id="seek" type="range" min="0" max="10000" value="0" step="1" aria-label="进度">
+  <select id="chapSel" aria-label="章节"></select>
+</div>
+
+<!--@SCRIPTS@-->
+<script src="engine.js"></script>
+<script src="scenes.js"></script>
+<!--@/SCRIPTS@-->
+<script>
+(function () {
+  const params = new URLSearchParams(location.search);
+  const RENDER = params.has('render');
+  if (RENDER) document.body.classList.add('render');
+  initStage();
+  const stage = document.getElementById('stage');
+  function fit() {
+    if (RENDER) { stage.style.transform = 'none'; return; }
+    const vp = document.getElementById('viewport');
+    const w = vp.clientWidth, h = vp.clientHeight;
+    const s = Math.min(w / 1920, h / 1080);
+    stage.style.transform = `translate(${(w - 1920 * s) / 2}px,${(h - 1080 * s) / 2}px) scale(${s})`;
+  }
+  window.addEventListener('resize', fit); fit();
+
+  let T = 0, playing = false, last = 0;
+  const fmt = x => Math.floor(x / 60) + ':' + String(Math.floor(x % 60)).padStart(2, '0');
+  const btn = document.getElementById('play'), bar = document.getElementById('seek');
+  const tm = document.getElementById('time'), sel = document.getElementById('chapSel');
+  SCENES.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.start; o.textContent = s.menu || (s.chap ? s.chap.num + ' ' + s.chap.t : '片头');
+    sel.appendChild(o);
+  });
+  function show(t) {
+    T = seek(t);
+    bar.value = Math.round(T / TOTAL * 10000);
+    tm.textContent = fmt(T) + ' / ' + fmt(TOTAL);
+    let cur = 0; SCENES.forEach((s, i) => { if (T >= s.start) cur = i; });
+    sel.selectedIndex = cur;
+  }
+  function frame(now) {
+    if (!playing) return;
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    let t = T + dt;
+    if (t >= TOTAL) { t = TOTAL; playing = false; btn.textContent = '▶'; }
+    show(t);
+    if (playing) requestAnimationFrame(frame);
+  }
+  function play(p) {
+    playing = p; btn.textContent = p ? '❚❚' : '▶';
+    if (p) { if (T >= TOTAL - 0.05) T = 0; last = performance.now(); requestAnimationFrame(frame); }
+  }
+  btn.onclick = () => play(!playing);
+  document.getElementById('restart').onclick = () => { show(0); play(true); };
+  bar.oninput = () => show(bar.value / 10000 * TOTAL);
+  sel.onchange = () => show(parseFloat(sel.value) + 0.01);
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); play(!playing); }
+    if (e.code === 'ArrowRight') show(T + 5);
+    if (e.code === 'ArrowLeft') show(T - 5);
+  });
+
+  window.__seek = t => { seek(t); return true; };
+  window.__total = () => TOTAL;
+  window.__captions = allCaptions;
+  const ready = () => { show(params.has('t') ? parseFloat(params.get('t')) : 0); window.__ready = true; if (!RENDER && !params.has('paused')) play(true); };
+  if (document.fonts && document.fonts.load) {
+    Promise.all([document.fonts.load('400 24px CBSans'), document.fonts.load('900 24px CBSans')])
+      .catch(() => {}).then(() => document.fonts.ready).then(ready);
+  } else ready();
+})();
+</script>
+</body>
+</html>
