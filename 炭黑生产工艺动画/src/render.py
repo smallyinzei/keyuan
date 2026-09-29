@@ -60,7 +60,7 @@ def render_chunk(args):
     k, f0, f1, fps, out = args
     from playwright.sync_api import sync_playwright
     cmd = [ffmpeg_exe(), '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'mjpeg', '-i', '-',
-           '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-pix_fmt', 'yuv420p', '-profile:v', 'high',
+           '-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation', '-crf', '22', '-pix_fmt', 'yuv420p', '-profile:v', 'high',
            '-g', str(fps * 2), '-r', str(fps), out]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     t0 = time.time()
