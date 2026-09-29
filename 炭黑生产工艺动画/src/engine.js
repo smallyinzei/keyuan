@@ -374,9 +374,14 @@ function initStage() {
   const stage = document.getElementById('stage');
   const layer = document.getElementById('scenes');
   let T0 = 0;
+  const WARP = window.WARP || {};               // 配音版：字幕窗口按配音时长拉伸（分段线性时间映射）
   SCENES.forEach((s, i) => {
     s.index = i;
-    s.start = T0; s.end = T0 + s.dur; T0 = s.end - XF;
+    const k = WARP[i] || [[0, 0], [s.dur, s.dur]];
+    s.toLocal = o => { for (let j = 1; j < k.length; j++) if (o <= k[j][1] || j === k.length - 1) return lerp(k[j - 1][0], k[j][0], clamp((o - k[j - 1][1]) / ((k[j][1] - k[j - 1][1]) || 1))); };
+    s.toOut = l => { for (let j = 1; j < k.length; j++) if (l <= k[j][0] || j === k.length - 1) return lerp(k[j - 1][1], k[j][1], clamp((l - k[j - 1][0]) / ((k[j][0] - k[j - 1][0]) || 1))); };
+    s.odur = k[k.length - 1][1];
+    s.start = T0; s.end = T0 + s.odur; T0 = s.end - XF;
     s.div = div(layer, 'scene');
     s.svg = el('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, s.div);
     s.html = div(s.div, 'html');
@@ -394,7 +399,7 @@ function initStage() {
   const prog = document.getElementById('prog');
   UI.progFill = [];
   SCENES.forEach(s => {
-    const len = s.dur - (s.index < SCENES.length - 1 ? XF : 0);
+    const len = s.odur - (s.index < SCENES.length - 1 ? XF : 0);
     const segDiv = div(prog, 'pseg', null, `flex:${len};--c:${SEC[s.section || 0]}`);
     UI.progFill.push({ f: div(segDiv, 'pfill'), s, len });
   });
@@ -407,18 +412,20 @@ function seek(T) {
   let cap = '', capA = 0, best = null, bestA = -1;
   const active = [];
   for (const s of SCENES) {
-    const lt = T - s.start;
-    if (lt < -1e-6 || lt > s.dur + 1e-6) { s.div.style.display = 'none'; continue; }
+    const ot = T - s.start;
+    if (ot < -1e-6 || ot > s.odur + 1e-6) { s.div.style.display = 'none'; continue; }
+    const lt = s.toLocal(ot);
     s.div.style.display = 'block';
     let a = 1;
-    if (s.index > 0) a = Math.min(a, clamp(lt / XF));
-    if (s.index < SCENES.length - 1) a = Math.min(a, clamp((s.dur - lt) / XF));
+    if (s.index > 0) a = Math.min(a, clamp(ot / XF));
+    if (s.index < SCENES.length - 1) a = Math.min(a, clamp((s.odur - ot) / XF));
     s.div.style.opacity = a;
     s.update(lt, s);
     active.push({ s, a });
     for (const c of (s.caps || [])) {
       if (lt >= c[0] && lt <= c[1]) {
-        const ca = Math.min(clamp((lt - c[0]) / 0.22), clamp((c[1] - lt) / 0.22)) * a;
+        const o0 = s.toOut(c[0]), o1 = s.toOut(c[1]);
+        const ca = Math.min(clamp((ot - o0) / 0.22), clamp((o1 - ot) / 0.22)) * a;
         if (ca > capA) { capA = ca; cap = c[2]; }
       }
     }
@@ -455,6 +462,6 @@ function seek(T) {
 
 function allCaptions() {
   const out = [];
-  for (const s of SCENES) for (const c of (s.caps || [])) out.push({ start: s.start + c[0], end: s.start + c[1], text: c[2] });
+  for (const s of SCENES) for (const c of (s.caps || [])) out.push({ start: s.start + s.toOut(c[0]), end: s.start + s.toOut(c[1]), text: c[2] });
   return out;
 }

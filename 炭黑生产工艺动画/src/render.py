@@ -4,6 +4,7 @@
   python render.py preview 3 25.5 60          # 截取指定时刻的画面到 preview/
   python render.py video  [--fps 30] [--workers 4]
   python render.py srt
+  NARRATED=1 python render.py video|srt    # 配音版（先运行 narrate.py 生成 voice/）
 
 依赖：playwright（Python）、imageio-ffmpeg；Chromium 路径可用环境变量 CHROME 指定。
 页面默认读取 ../炭黑生产工艺流程动画.html（build.py 生成的单文件版）。
@@ -17,6 +18,8 @@ ROOT = HERE.parent
 PAGE = Path(os.environ.get('PAGE', ROOT / '炭黑生产工艺流程动画.html'))
 CHROME = os.environ.get('CHROME', '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell')
 W, H = 1920, 1080
+NARRATED = os.environ.get('NARRATED') == '1'          # 配音版：按 voice/warp.json 拉伸时间轴并混入 voice/*.mp3
+VOICE_DIR = HERE / 'voice'
 
 
 def ffmpeg_exe():
@@ -28,6 +31,8 @@ def open_page(p):
     from playwright.sync_api import sync_playwright  # noqa
     browser = p.chromium.launch(executable_path=CHROME, args=['--force-color-profile=srgb', '--hide-scrollbars', '--font-render-hinting=none'])
     page = browser.new_page(viewport={'width': W, 'height': H}, device_scale_factor=1)
+    if NARRATED:
+        page.add_init_script('window.WARP = ' + (VOICE_DIR / 'warp.json').read_text(encoding='utf-8') + ';')
     page.goto(PAGE.as_uri() + '?render', wait_until='load')
     page.wait_for_function('window.__ready === true', timeout=60000)
     return browser, page
@@ -90,12 +95,37 @@ def video(fps, workers, out):
     lst.write_text(''.join(f"file '{p}'\n" for p in parts))
     joined = tmp / 'joined.mp4'
     subprocess.run([ffmpeg_exe(), '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', str(lst), '-c', 'copy', str(joined)], check=True)
-    # 加一条静音音轨，兼容部分播放器 / 微信
-    subprocess.run([ffmpeg_exe(), '-y', '-loglevel', 'error', '-i', str(joined), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
-                    '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '64k', '-shortest',
-                    '-movflags', '+faststart', str(out)], check=True)
+    if NARRATED:
+        mix_voice(joined, out, T)
+    else:
+        # 加一条静音音轨，兼容部分播放器 / 微信
+        subprocess.run([ffmpeg_exe(), '-y', '-loglevel', 'error', '-i', str(joined), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+                        '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '64k', '-shortest',
+                        '-movflags', '+faststart', str(out)], check=True)
     shutil.rmtree(tmp, ignore_errors=True)
     print('wrote', out)
+
+
+def clip_starts():
+    """每段配音在成片中的起始时间 = 场景起点 + 该条字幕起点（映射后）+ 0.15 s"""
+    from playwright.sync_api import sync_playwright
+    items = json.loads((VOICE_DIR / 'manifest.json').read_text(encoding='utf-8'))
+    with sync_playwright() as p:
+        b, page = open_page(p)
+        starts = page.evaluate('(its) => its.map(it => SCENES[it.scene].start + SCENES[it.scene].toOut(it.t0) + 0.15)', items)
+        b.close()
+    return items, starts
+
+
+def mix_voice(video_in, out, T):
+    items, starts = clip_starts()
+    cmd = [ffmpeg_exe(), '-y', '-loglevel', 'error', '-i', str(video_in)]
+    for it in items: cmd += ['-i', str(VOICE_DIR / it['file'])]
+    parts = [f'[{i + 1}:a]aresample=44100,adelay={int(st * 1000)}:all=1[a{i}]' for i, st in enumerate(starts)]
+    parts.append(''.join(f'[a{i}]' for i in range(len(items))) + f'amix=inputs={len(items)}:normalize=0,apad,atrim=0:{T:.3f},loudnorm=I=-16:TP=-1.5[aout]')
+    cmd += ['-filter_complex', ';'.join(parts), '-map', '0:v', '-map', '[aout]', '-c:v', 'copy',
+            '-c:a', 'aac', '-b:a', '128k', '-ac', '2', '-movflags', '+faststart', str(out)]
+    subprocess.run(cmd, check=True)
 
 
 def srt_time(x):
@@ -128,6 +158,6 @@ if __name__ == '__main__':
     if a.mode == 'preview':
         preview(a.times, Path(a.out or HERE / 'preview'))
     elif a.mode == 'video':
-        video(a.fps, a.workers, a.out or str(ROOT / '炭黑生产工艺流程动画.mp4'))
+        video(a.fps, a.workers, a.out or str(ROOT / ('炭黑生产工艺流程动画_配音版.mp4' if NARRATED else '炭黑生产工艺流程动画.mp4')))
     else:
-        write_srt(a.out or str(ROOT / '炭黑生产工艺流程动画_字幕.srt'))
+        write_srt(a.out or str(ROOT / ('炭黑生产工艺流程动画_配音版_字幕.srt' if NARRATED else '炭黑生产工艺流程动画_字幕.srt')))
