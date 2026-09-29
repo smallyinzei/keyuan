@@ -7,6 +7,8 @@
 | 文件 | 用途 |
 |---|---|
 | `炭黑生产工艺流程动画.mp4` | 成片视频：1920×1080、30 fps、H.264、5 分 19 秒、约 38 MB，字幕已压在画面里（含静音音轨，兼容微信等播放器）。可直接发微信、插入 PPT 或投屏播放 |
+| `炭黑生产工艺流程动画_配音版.mp4` | 中文配音版：6 分 00 秒、1080p、约 47 MB。配音为微软 edge-tts「云扬」男声（zh-CN-YunyangNeural），逐句朗读字幕；为让画面等配音，字幕窗口按配音时长做了拉伸，音画逐句对齐 |
+| `炭黑生产工艺流程动画_配音版_字幕.srt` | 配音版对应的字幕时间轴 |
 | `炭黑生产工艺流程动画.html` | 交互版：离线可用，双击用浏览器打开。空格键暂停，← → 键快退 / 快进 5 秒，右下角可按章节跳转 |
 | `炭黑生产工艺流程动画_字幕.srt` | 字幕文件。如需配音，可导入剪映，用“文本朗读”生成旁白 |
 | `src/` | 源代码：`scenes.js` 是分镜与字幕，`build.py` 生成单文件 HTML，`render.py` 渲染视频和 SRT |
@@ -51,6 +53,9 @@ python src/build.py                 # 生成单文件 HTML（内嵌字体子集�
 python src/render.py video          # 渲染 MP4（Chromium 路径可用环境变量 CHROME 指定）
 python src/render.py srt            # 导出字幕
 python src/render.py preview 95 115 # 截取指定秒数的画面检查
+pip install edge-tts
+python src/narrate.py                # 生成配音片段 src/voice/ 与时间拉伸节点
+NARRATED=1 python src/render.py video  # 渲染配音版；NARRATED=1 ... srt 导出配音版字幕
 ```
 
 字幕和画面的时间都写在 `src/scenes.js` 各场景的 `caps` 与 `update()` 中。改完文字后重新执行 `build.py` 和 `render.py` 即可。
