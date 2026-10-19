@@ -449,6 +449,10 @@ export function buildAllWorkbook(an: Analysis): ExcelJS.Workbook {
 }
 
 export async function workbookBytes(wb: ExcelJS.Workbook): Promise<Uint8Array> {
+  // 打印：A4 横向，宽度缩放到一页
+  wb.eachSheet((ws) => {
+    ws.pageSetup = { ...ws.pageSetup, paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+  });
   const buf = await wb.xlsx.writeBuffer();
   return new Uint8Array(buf as ArrayBuffer);
 }
