@@ -16,7 +16,9 @@ describe('edge cases', () => {
     ]);
     expect(m.get('A')).toBe('C');
     expect(m.get('B')).toBe('C');
-    expect(['X', 'Y']).toContain(m.get('X'));
+    // 循环时后设置的优先，旧的反向映射被丢弃，不会互换
+    expect(m.get('Y')).toBe('X');
+    expect(m.get('X')).toBeUndefined();
   });
 
   it('reports a friendly error for workbooks without the sheet pairs', () => {

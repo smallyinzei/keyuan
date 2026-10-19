@@ -6,7 +6,11 @@ import {
   computeLines,
   excludedSet,
   indexStandards,
+  isExcluded,
+  paidQtyOf,
   primaryBasis,
+  rowTotal,
+  rowTotalCandidates,
   settingsFor,
   stdKey,
   type Basis,
@@ -55,6 +59,9 @@ export const CATEGORY = {
   basis: '口径',
   coef: '完成系数',
   related: '关联公司',
+  duplicate: '重复型号',
+  total: '合计核对',
+  paid: '回款信息',
   parse: '解析',
 } as const;
 
@@ -71,6 +78,7 @@ interface Group {
   shipped: number;
   avgContract: number | null;
   avgShipped: number | null;
+  priceMissing: number;
 }
 
 function groupOrders(orders: Order[]): Map<string, Group> {
@@ -79,7 +87,7 @@ function groupOrders(orders: Order[]): Map<string, Group> {
     const k = stdKey(o.company, o.month, o.modelKey);
     let g = m.get(k);
     if (!g) {
-      g = { company: o.company, month: o.month, modelKey: o.modelKey, model: o.model, orders: [], contractQty: 0, shipped: 0, avgContract: null, avgShipped: null };
+      g = { company: o.company, month: o.month, modelKey: o.modelKey, model: o.model, orders: [], contractQty: 0, shipped: 0, avgContract: null, avgShipped: null, priceMissing: 0 };
       m.set(k, g);
     }
     g.orders.push(o);
@@ -89,16 +97,24 @@ function groupOrders(orders: Order[]): Map<string, Group> {
     let sq = 0;
     let ca = 0;
     let sa = 0;
+    let missC = false;
+    let missS = false;
     for (const o of g.orders) {
       cq += o.contractQty;
       sq += o.shipped;
       ca += o.contractQty * o.netPrice;
       sa += o.shipped * o.netPrice;
+      if (o.priceMissing) {
+        g.priceMissing++;
+        if (o.contractQty > 0) missC = true;
+        if (o.shipped > 0) missS = true;
+      }
     }
     g.contractQty = cq;
     g.shipped = sq;
-    g.avgContract = cq > 0 ? ca / cq : null;
-    g.avgShipped = sq > 0 ? sa / sq : null;
+    // 有订单缺含税单价时均价无法确定（不按 0 计算）
+    g.avgContract = cq > 0 && !missC ? ca / cq : null;
+    g.avgShipped = sq > 0 && !missS ? sa / sq : null;
   }
   return m;
 }
@@ -109,15 +125,18 @@ const loc = (sheet: string, col: string | undefined, row: number) => `${sheet}!$
 export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
   const issues: Issue[] = [];
   let seq = 0;
-  const add = (i: Omit<Issue, 'id' | 'impactNote' | 'suggestion'> & Partial<Pick<Issue, 'impactNote' | 'suggestion'>>) => {
-    issues.push({ id: `${++seq}`, impactNote: '', suggestion: '', ...i });
+  const add = (i: Omit<Issue, 'id' | 'impactNote' | 'suggestion' | 'adopted'> & Partial<Pick<Issue, 'impactNote' | 'suggestion' | 'adopted'>>) => {
+    issues.push({ id: `${++seq}`, impactNote: '', suggestion: '', adopted: false, ...i });
   };
 
   const groups = groupOrders(pw.orders);
   const summaryIdx = new Map<string, SummaryRow>();
-  for (const s of pw.summaries) summaryIdx.set(stdKey(s.company, s.month, s.modelKey), s);
+  for (const s of pw.summaries) if (!summaryIdx.has(stdKey(s.company, s.month, s.modelKey))) summaryIdx.set(stdKey(s.company, s.month, s.modelKey), s);
   const calcIdx = new Map<string, CalcRow>();
-  for (const c of pw.calcRows) calcIdx.set(stdKey(c.company, c.month, c.modelKey), c);
+  for (const c of pw.calcRows) if (!calcIdx.has(stdKey(c.company, c.month, c.modelKey))) calcIdx.set(stdKey(c.company, c.month, c.modelKey), c);
+  /** 定档用的含税均价：优先用明细重算的合同均价（原表口径），其次汇总行，最后才用表内缓存值 */
+  const rightAvg = (r: CalcRow): number | null =>
+    groups.get(stdKey(r.company, r.month, r.modelKey))?.avgContract ?? summaryIdx.get(stdKey(r.company, r.month, r.modelKey))?.foreignAvg ?? r.avgTax;
 
   // ── 解析阶段的问题 ──
   for (const w of pw.warnings) {
@@ -164,6 +183,7 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
           message: `${s.model} 外贸销售均价与明细重算不一致：Σ(合同数量×出厂单价)/Σ合同数量 = ${plain(g.avgContract)}${isShippedAvg ? '（表内值等于出库加权均价，口径不同）' : ''}`,
           impactNote: `按表内实发 ${plain(tableQty, 4)} 吨计算溢价差`,
           suggestion: s.formulas.foreignAvg ? `核对公式 ${s.formulas.foreignAvg}` : '核对手填均价',
+          adopted: true,
         });
       }
     }
@@ -175,7 +195,7 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
     if (s.premium !== null && s.foreignAvg !== null && s.domesticAvg !== null && s.shippedQty !== null) {
       const exp = (s.foreignAvg - s.domesticAvg) * PREMIUM_RATE * s.shippedQty;
       if (!near(exp, s.premium, 0.01)) {
-        add({ severity: 'high', category: CATEGORY.formula, company: s.company, month: s.month, model: s.model, location: loc(s.sheet, s.cols.premium, s.row), original: plain(s.premium), expected: plain(exp), impact: calc ? exp - s.premium : null, message: `${s.model} 溢价提成 ≠ (外贸均价 − 内贸均价) × 10% × 实发数量`, suggestion: s.formulas.premium ? `核对公式 ${s.formulas.premium}` : '' });
+        add({ severity: 'high', category: CATEGORY.formula, company: s.company, month: s.month, model: s.model, location: loc(s.sheet, s.cols.premium, s.row), original: plain(s.premium), expected: plain(exp), impact: calc ? exp - s.premium : null, message: `${s.model} 溢价提成 ≠ (外贸均价 − 内贸均价) × 10% × 实发数量`, suggestion: s.formulas.premium ? `核对公式 ${s.formulas.premium}` : '', adopted: true });
       }
     }
   }
@@ -204,6 +224,7 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
           ? '缺均价或内贸均价，无法估算'
           : `溢价 ${plain(premiumDelta)}${unitDelta !== null ? `，数量×单价 ${plain(unitDelta)}` : '，单价部分待补'}`,
       suggestion: `明细 ${g.orders.map((o) => loc(o.sheet, o.cols.shipped, o.row)).join('、')} 合计 ${plain(g.shipped, 4)}`,
+      adopted: true,
     });
   }
 
@@ -254,7 +275,7 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
             const cached = f === 'qty' ? r.qty : f === 'avgTax' ? r.avgTax : r.premium;
             let impact: number | null = null;
             if (expectedVal !== null && cached !== null) {
-              if (f === 'qty') impact = (r.unitPrice ?? 0) * (expectedVal - cached);
+              if (f === 'qty' && r.unitPrice !== null) impact = r.unitPrice * (expectedVal - cached);
               if (f === 'premium') impact = expectedVal - cached;
             }
             refFlagged.add(`${r.sheet}!${r.row}`);
@@ -269,7 +290,9 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
               expected: s ? `=${s.sheet}!${s.cols[sf]}${s.row}（${r.month}月 ${r.model}）` : `引用 ${r.month}月 ${r.model} 的汇总行`,
               impact,
               message: `${fieldName[f]}引用了 ${role.month}月 ${role.model} 的行，本行是 ${r.month}月 ${r.model}`,
-              impactNote: f === 'avgTax' ? '影响不含税均价、边际贡献与档级判定' : '',
+              impactNote: f === 'avgTax' ? '影响不含税均价、边际贡献与档级判定（档级影响见“档级”一项，未自动采用）' : f === 'qty' && r.unitPrice === null ? '提成单价为空，数量×单价部分待补' : '',
+              // 数量与溢价由明细重算，已采用；均价影响档级与单价，需确认
+              adopted: f !== 'avgTax',
             });
           }
         }
@@ -287,9 +310,10 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
             location: loc(r.sheet, col, r.row),
             original: `手填 ${plain(cached, 4)}`,
             expected: `=${s!.sheet}!${s!.cols[sf]}${s!.row}（${plain(expectedVal, 4)}）`,
-            impact: same ? 0 : f === 'qty' ? (r.unitPrice ?? 0) * (expectedVal - cached) : f === 'premium' ? expectedVal - cached : null,
+            impact: same ? 0 : f === 'qty' ? (r.unitPrice === null ? null : r.unitPrice * (expectedVal - cached)) : f === 'premium' ? expectedVal - cached : null,
             message: same ? `${fieldName[f]}是手填数值，同列其他行引用明细；当前数值与明细一致` : `${fieldName[f]}手填数值与明细汇总不一致`,
             suggestion: '改为引用明细汇总单元格，避免明细修改后不同步',
+            adopted: !same && f !== 'avgTax',
           });
         }
       }
@@ -297,7 +321,8 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
     for (const f of sameRowFields) {
       const fm = r.formulas[f];
       if (!fm) continue;
-      const wrong = parseRefs(fm).filter((ref) => (!ref.sheet || ref.sheet === r.sheet) && !ref.end && ref.row !== r.row);
+      // 只把指向其他数据行的相对引用视为错行（$M$1 这类常量单元格、表外单元格不算）
+      const wrong = parseRefs(fm).filter((ref) => (!ref.sheet || ref.sheet === r.sheet) && !ref.end && !ref.rowAbs && ref.row !== r.row && !!pw.rowRoles[r.sheet]?.[ref.row]);
       if (!wrong.length) continue;
       const roles = wrong.map((ref) => {
         const role = pw.rowRoles[r.sheet]?.[ref.row];
@@ -309,7 +334,7 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
         return wrong.some((w) => w.col === c && w.row === Number(rowNo)) ? `${d1}${c}${d2}${r.row}` : all;
       });
       let impact: number | null = null;
-      if (f === 'total' && r.total !== null) impact = (r.unitPrice ?? 0) * (r.qty ?? 0) + (r.premium ?? 0) - r.total;
+      if (f === 'total' && r.total !== null && (r.unitPrice !== null || !r.qty)) impact = rowTotal(r, cfg.premiumNeedsTarget) - r.total;
       refFlagged.add(`${r.sheet}!${r.row}`);
       add({
         severity: 'high',
@@ -322,21 +347,23 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
         expected: fixed,
         impact,
         message: `${fieldName[f]}公式引用了其他行：${roles.join('、')}；本行是 ${r.month}月 ${r.model}`,
-        impactNote: f === 'total' ? '提成合计 = 本行单价 × 本行出库数量 + 本行溢价' : '影响边际贡献与档级判定',
+        impactNote: f === 'total' ? (r.unitPrice === null && r.qty ? '提成单价为空，无法估算' : '提成合计 = 本行单价 × 本行出库数量 + 本行溢价') : '影响边际贡献与档级判定（未自动采用）',
+        adopted: f === 'total',
       });
     }
     // 公式数值重算
     if (r.total !== null && !refFlagged.has(`${r.sheet}!${r.row}`)) {
-      const exp = (r.unitPrice ?? 0) * (r.qty ?? 0) + (r.premium ?? 0);
-      if (!near(exp, r.total, 0.01)) {
-        add({ severity: 'high', category: CATEGORY.formula, company: r.company, month: r.month, model: r.model, location: loc(r.sheet, r.cols.total, r.row), original: plain(r.total), expected: plain(exp), impact: exp - r.total, message: `${r.model} 提成合计 ≠ 提成单价 × 出库数量 + 溢价提成`, suggestion: r.formulas.total ? `核对公式 ${r.formulas.total}` : '' });
+      const exp = rowTotal(r, cfg.premiumNeedsTarget);
+      if (!rowTotalCandidates(r).some((v) => near(v, r.total!, 0.01))) {
+        const pending = r.unitPrice === null && !!r.qty;
+        add({ severity: 'high', category: CATEGORY.formula, company: r.company, month: r.month, model: r.model, location: loc(r.sheet, r.cols.total, r.row), original: plain(r.total), expected: plain(exp), impact: pending ? null : exp - r.total, impactNote: pending ? '提成单价为空，无法估算' : '', message: `${r.model} 提成合计 ≠ 提成单价 × 出库数量 + 溢价提成${r.coef !== null ? '（已考虑本行完成系数）' : ''}`, suggestion: r.formulas.total ? `核对公式 ${r.formulas.total}` : '', adopted: true });
       }
     }
     if (r.avgTax !== null && r.avgNet !== null && !near(r.avgTax / VAT_DIVISOR, r.avgNet, 0.01)) {
       add({ severity: 'medium', category: CATEGORY.formula, company: r.company, month: r.month, model: r.model, location: loc(r.sheet, r.cols.avgNet, r.row), original: plain(r.avgNet), expected: plain(r.avgTax / VAT_DIVISOR), impact: null, message: `${r.model} 不含税均价 ≠ 含税均价 / 1.13`, impactNote: '影响边际贡献与档级' });
     }
     if (s && r.qty !== null && s.shippedQty !== null && !near(r.qty, s.shippedQty, 1e-6) && !refFlagged.has(`${r.sheet}!${r.row}`) && r.formulas.qty) {
-      add({ severity: 'high', category: CATEGORY.formula, company: r.company, month: r.month, model: r.model, location: loc(r.sheet, r.cols.qty, r.row), original: plain(r.qty, 4), expected: plain(s.shippedQty, 4), impact: (r.unitPrice ?? 0) * (s.shippedQty - r.qty), message: `${r.model} 出库数量与明细汇总实发不一致` });
+      add({ severity: 'high', category: CATEGORY.formula, company: r.company, month: r.month, model: r.model, location: loc(r.sheet, r.cols.qty, r.row), original: plain(r.qty, 4), expected: plain(s.shippedQty, 4), impact: r.unitPrice === null ? null : r.unitPrice * (s.shippedQty - r.qty), impactNote: r.unitPrice === null ? '提成单价为空，数量×单价部分待补' : '', message: `${r.model} 出库数量与明细汇总实发不一致`, adopted: true });
     }
   }
 
@@ -350,12 +377,16 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
       }
       continue;
     }
-    if (r.avgTax === null) continue;
-    const net = r.avgNet ?? r.avgTax / VAT_DIVISOR;
-    const margin = net - r.varCost;
-    if (r.margin !== null && !near(r.margin, margin, 0.01)) {
-      add({ severity: 'medium', category: CATEGORY.formula, company: r.company, month: r.month, model: r.model, location: loc(r.sheet, r.cols.margin, r.row), original: plain(r.margin), expected: plain(margin), impact: null, message: `${r.model} 边际贡献 ≠ 不含税均价 − 变动成本` });
+    // 表内公式核对用缓存值
+    const netCached = r.avgNet ?? (r.avgTax !== null ? r.avgTax / VAT_DIVISOR : null);
+    if (r.margin !== null && netCached !== null && !near(r.margin, netCached - r.varCost, 0.01)) {
+      add({ severity: 'medium', category: CATEGORY.formula, company: r.company, month: r.month, model: r.model, location: loc(r.sheet, r.cols.margin, r.row), original: plain(r.margin), expected: plain(netCached - r.varCost), impact: null, message: `${r.model} 边际贡献 ≠ 不含税均价 − 变动成本` });
     }
+    // 定档用正确的均价（引用错行、均价算错时，按缓存值定档会得出错误结论）
+    const avg = rightAvg(r);
+    if (avg === null) continue;
+    const margin = avg / VAT_DIVISOR - r.varCost;
+    const avgNote = r.avgTax !== null && !near(r.avgTax, avg) ? `；按明细重算均价 ${plain(avg)} 计（表内出库均价为 ${plain(r.avgTax)}）` : '';
     const { table, reason } = tableFor(pw.tierTables, r.company, r.month, r.model);
     if (!table) {
       add({ severity: 'medium', category: CATEGORY.tier, company: r.company, month: r.month, model: r.model, location: loc(r.sheet, r.cols.tier, r.row), original: r.tier ?? '（空）', expected: '—', impact: null, message: `${r.company}提成计算表没有可用的档级表，无法核对档级` });
@@ -374,7 +405,7 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
         original: r.tier ?? '（空）',
         expected: look.tier ?? '无法定档',
         impact: newPrice !== null && r.unitPrice !== null && r.qty !== null ? (newPrice - r.unitPrice) * r.qty : null,
-        message: `${r.model} 边际贡献 ${plain(margin)} 按「${table.label}」应为 ${look.tier ?? '—'}（${reason}）`,
+        message: `${r.model} 边际贡献 ${plain(margin)} 按「${table.label}」应为 ${look.tier ?? '—'}（${reason}${avgNote}）`,
         impactNote: newPrice !== null ? `按同公司 ${look.tier} 档单价 ${plain(newPrice)} 估算` : '该档在本公司无参考单价，无法估算',
       });
     } else if (look.ambiguous) {
@@ -462,9 +493,9 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
     if (t.unmodified) continue;
     const probs = boundaryProblems(t);
     if (!probs.length) continue;
-    const users = pw.calcRows.filter((r) => r.company === t.company && r.varCost !== null && r.avgTax !== null && tableFor(pw.tierTables, r.company, r.month, r.model).table === t);
+    const users = pw.calcRows.filter((r) => r.company === t.company && r.varCost !== null && rightAvg(r) !== null && tableFor(pw.tierTables, r.company, r.month, r.model).table === t);
     const hitRows = users.filter((r) => {
-      const margin = (r.avgNet ?? r.avgTax! / VAT_DIVISOR) - r.varCost!;
+      const margin = rightAvg(r)! / VAT_DIVISOR - r.varCost!;
       return probs.some((p) => p.zone && margin >= p.zone[0] && margin <= p.zone[1]);
     });
     add({
@@ -503,6 +534,7 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
         impact: prem,
         message: `${g.month}月 ${g.model} 有实发 ${plain(g.shipped, 4)} 吨，但提成计算表没有该型号`,
         impactNote: prem === null ? '缺内贸均价，无法估算' : `仅溢价部分；数量×单价部分待补（${plain(g.shipped, 4)} 吨 × 单价）`,
+        adopted: prem !== null,
       });
     }
   }
@@ -569,8 +601,9 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
     const copied = srcs.find((c) => c !== own && near(c.varCost, base, 0.005));
     let impact: number | null = null;
     let impactNote = '';
-    if (r.avgTax !== null) {
-      const margin = (r.avgNet ?? r.avgTax / VAT_DIVISOR) - expected;
+    const avgR = rightAvg(r);
+    if (avgR !== null) {
+      const margin = avgR / VAT_DIVISOR - expected;
       const { table } = tableFor(pw.tierTables, r.company, r.month, r.model);
       if (table) {
         const look = tierOf(margin, table);
@@ -749,11 +782,98 @@ export function runChecks(pw: ParsedWorkbook, cfg: RuleConfig): Issue[] {
     });
   }
 
-  // ── 14. 完成系数 ──
+  // ── 14. 重复型号、表内合计、原表完成系数列、回款信息 ──
+  for (const d of pw.duplicates) {
+    add({
+      severity: 'high',
+      category: CATEGORY.duplicate,
+      company: d.company,
+      month: d.month,
+      model: d.model,
+      location: d.rows.map((row) => `${d.sheet}!${row}行`).join('、'),
+      original: `${d.kind === 'calc' ? '提成计算表' : '明细汇总块'}出现 ${d.rows.length} 次`,
+      expected: '每月每型号一行',
+      impact: null,
+      message: `${d.month}月 ${d.model} 在${d.kind === 'calc' ? '提成计算表' : '明细汇总块'}重复出现（第 ${d.rows.join('、')} 行）${d.conflict.length ? `，且${d.conflict.join('、')}不一致 → 工具按待补处理` : '，数值一致，工具只取一行'}`,
+      impactNote: d.kind === 'calc' ? '原表“提成合计”会把重复行都加进去，重算只计一次' : '',
+      suggestion: '合并或删除重复行',
+    });
+  }
+  for (const t of pw.calcTotalRows) {
+    if (t.total === null) continue;
+    const rows = pw.calcRows.filter((r) => r.company === t.company && r.sheet === t.sheet);
+    const sum = rows.reduce((a, r) => a + (r.total ?? 0), 0);
+    if (!near(sum, t.total, 0.01)) {
+      add({
+        severity: 'high',
+        category: CATEGORY.total,
+        company: t.company,
+        month: null,
+        model: '',
+        location: `${t.sheet}!${t.addr}`,
+        original: plain(t.total),
+        expected: `${plain(sum)}（各行提成合计之和）`,
+        impact: sum - t.total,
+        message: `${t.company}提成计算表“合计”与各行之和不一致（合计公式可能漏行或多行）`,
+        impactNote: '本工具的“原表部门提成”按各行之和；若发放按表内合计，差额即左列',
+        suggestion: '核对合计行的 SUM 范围',
+      });
+    }
+  }
+  for (const t of pw.summaryTotalRows) {
+    const rows = pw.summaries.filter((x) => x.company === t.company && x.month === t.month && x.sheet === t.sheet);
+    const prem = rows.reduce((a, x) => a + (x.premium ?? 0), 0);
+    const qty = rows.reduce((a, x) => a + (x.shippedQty ?? 0), 0);
+    const bad: string[] = [];
+    if (t.premium !== null && !near(t.premium, prem, 0.01)) bad.push(`溢价合计 ${plain(t.premium)} ≠ ${plain(prem)}`);
+    if (t.shippedQty !== null && !near(t.shippedQty, qty, 1e-6)) bad.push(`实发合计 ${plain(t.shippedQty, 4)} ≠ ${plain(qty, 4)}`);
+    if (bad.length) {
+      add({ severity: 'medium', category: CATEGORY.total, company: t.company, month: t.month, model: '', location: `${t.sheet}!${t.row}行`, original: bad.join('；'), expected: '等于各行之和', impact: null, message: `${t.month}月汇总块“合计”与各行之和不一致`, suggestion: '核对合计行的 SUM 范围' });
+    }
+  }
+  const withK = pw.calcRows.filter((r) => r.coef !== null);
+  if (withK.length) {
+    add({
+      severity: 'low',
+      category: CATEGORY.coef,
+      company: [...new Set(withK.map((r) => r.company))].join('、'),
+      month: null,
+      model: withK.map((r) => `${r.month}月${r.model}`).join('、'),
+      location: withK.map((r) => loc(r.sheet, r.cols.coef, r.row)).join('、'),
+      original: withK.map((r) => `${r.model} ${plain(r.coef, 4)}`).join('；'),
+      expected: '按规则配置计算',
+      impact: null,
+      message: '原表“完成系数”列有填写；工具核对提成合计时已考虑该系数，重算时按规则配置中的完成系数计入',
+    });
+  }
+  const basesUsingPaid = [primaryBasis(cfg), comparisonBasis(cfg)].some((b) => b.qty === 'shippedPaid');
+  if (basesUsingPaid) {
+    const unknown = pw.orders.filter((o) => o.shipped > 0 && !isExcluded(o, excludedSet(cfg)) && paidQtyOf(o, cfg.supplements) === null);
+    if (unknown.length) {
+      add({
+        severity: 'medium',
+        category: CATEGORY.paid,
+        company: [...new Set(unknown.map((o) => o.company))].join('、'),
+        month: null,
+        model: '',
+        location: unknown.slice(0, 6).map((o) => `${o.sheet}!${o.row}行`).join('、') + (unknown.length > 6 ? ` 等 ${unknown.length} 行` : ''),
+        original: `${unknown.length} 笔有出库但没有回款信息`,
+        expected: '在明细加“回款”列或在规则配置中标记',
+        impact: null,
+        message: '“出库且回款”口径下，这些出库未计入数量（不按已回款处理）',
+        impactNote: '待补',
+      });
+    }
+  }
+
+  // ── 15. 完成系数 ──
   const coefs = coefficients(pw, cfg);
   for (const company of pw.companies) {
     const c = coefs[company];
     const sheet = pw.completion.find((x) => x.company === company);
+    if (c.note) {
+      add({ severity: 'medium', category: CATEGORY.coef, company, month: null, model: '', location: '', original: c.note, expected: '完成率按小数填写（71.26% = 0.7126）', impact: null, message: `${company}完成率数值异常：${c.note}` });
+    }
     if (cfg.completion.mode !== 'none' && c.missing) {
       add({ severity: 'medium', category: CATEGORY.coef, company, month: null, model: '', location: '', original: '无完成率', expected: '在规则配置中填写完成率', impact: null, message: `已启用“${cfg.completion.mode === 'volume' ? '按销量' : '按金额'}”完成系数，但 ${company} 没有完成率数据，暂按 1 计算` });
     }

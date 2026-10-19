@@ -200,7 +200,10 @@ function writePersonSummary(wb: ExcelJS.Workbook, an: Analysis) {
     const p = primIdx.get(o.k);
     const c = compIdx.get(o.k);
     const pend = [...(p?.totals.pendingUnit ?? []).map((l) => `主:${l.model}`), ...(c?.totals.pendingUnit ?? []).map((l) => `对照:${l.model}`)].join('、');
-    const row = ws.addRow([o.person, o.company, `${o.month}月`, p?.totals.qty ?? 0, p?.totals.unitComm ?? 0, p?.totals.premium ?? 0, p?.totals.final ?? 0, c?.totals.qty ?? 0, c?.totals.final ?? 0, (p?.totals.final ?? 0) - (c?.totals.final ?? 0), pend]);
+    // 月行与季度行都用完成系数后的金额，保证 出库量提成 + 溢价提成 = 小计
+    const pu = (p?.totals.unitComm ?? 0) * (p?.totals.coefUnit ?? 1);
+    const pp = (p?.totals.premium ?? 0) * (p?.totals.coefPremium ?? 1);
+    const row = ws.addRow([o.person, o.company, `${o.month}月`, p?.totals.qty ?? 0, pu, pp, p?.totals.final ?? 0, c?.totals.qty ?? 0, c?.totals.final ?? 0, (p?.totals.final ?? 0) - (c?.totals.final ?? 0), pend]);
     styleBody(row, 1, 11);
     for (const col of [4, 8]) row.getCell(col).numFmt = FMT_QTY;
     for (const col of [5, 6, 7, 9, 10]) row.getCell(col).numFmt = FMT_MONEY;
@@ -209,8 +212,8 @@ function writePersonSummary(wb: ExcelJS.Workbook, an: Analysis) {
     agg.c += c?.totals.final ?? 0;
     agg.pq += p?.totals.qty ?? 0;
     agg.cq += c?.totals.qty ?? 0;
-    agg.pu += (p?.totals.unitComm ?? 0) * (p?.totals.coefUnit ?? 1);
-    agg.pp += (p?.totals.premium ?? 0) * (p?.totals.coefPremium ?? 1);
+    agg.pu += pu;
+    agg.pp += pp;
     perPerson.set(o.person, agg);
   }
   ws.addRow([]);
@@ -246,9 +249,9 @@ function writeBasisCompare(wb: ExcelJS.Workbook, an: Analysis) {
     const row = ws.addRow([
       c.company,
       `${c.month}月`,
-      c.original,
+      c.hasOriginal ? c.original : '未列',
       c.primary.final,
-      c.original === null ? null : c.primary.final - c.original,
+      c.primary.final - c.original,
       c.comparison.final,
       c.primary.final - c.comparison.final,
       c.personPrimary.final,
@@ -259,7 +262,7 @@ function writeBasisCompare(wb: ExcelJS.Workbook, an: Analysis) {
     for (const col of [3, 4, 5, 6, 7, 8, 9]) row.getCell(col).numFmt = FMT_MONEY;
   }
   const s = (f: (c: Analysis['cm'][number]) => number | null) => an.cm.reduce((a, c) => a + (f(c) ?? 0), 0);
-  const tr = ws.addRow(['合计', '', s((c) => c.original), s((c) => c.primary.final), s((c) => (c.original === null ? null : c.primary.final - c.original)), s((c) => c.comparison.final), s((c) => c.primary.final - c.comparison.final), s((c) => c.personPrimary.final), s((c) => c.personPrimary.final - c.primary.final), '']);
+  const tr = ws.addRow(['合计', '', s((c) => c.original), s((c) => c.primary.final), s((c) => c.primary.final - c.original), s((c) => c.comparison.final), s((c) => c.primary.final - c.comparison.final), s((c) => c.personPrimary.final), s((c) => c.personPrimary.final - c.primary.final), '']);
   styleBody(tr, 1, 10);
   tr.font = { name: FONT, bold: true, size: 10 };
   for (const col of [3, 4, 5, 6, 7, 8, 9]) tr.getCell(col).numFmt = FMT_MONEY;
@@ -325,15 +328,12 @@ const ADOPTED: Record<string, string> = {
   person: 'Σ个人与部门的均价结构差',
 };
 
-const ADOPTED_CATEGORIES = new Set<string>([CATEGORY.ref, CATEGORY.shipped, CATEGORY.avg, CATEGORY.missingModel]);
-
 function changeRows(an: Analysis): (string | number | null)[][] {
   const rows: (string | number | null)[][] = [];
   let n = 0;
   for (const i of an.issues) {
     if (i.severity === 'low' && !(i.impact && Math.abs(i.impact) >= 0.005)) continue;
-    const adopted = ADOPTED_CATEGORIES.has(i.category) || (i.category === CATEGORY.formula && i.impact !== null && i.impact !== 0);
-    const tag = adopted ? '重算已采用' : i.category === CATEGORY.missingPrice ? '待补' : i.category === CATEGORY.basis ? '口径说明' : '待确认（未采用）';
+    const tag = i.adopted ? '重算已采用' : i.category === CATEGORY.missingPrice || i.category === CATEGORY.paid ? '待补' : i.category === CATEGORY.basis ? '口径说明' : '待确认（未采用）';
     rows.push([++n, tag, i.company, i.month ? `${i.month}月` : '', i.location, i.original, i.expected, i.impact, `${i.message}${i.impactNote ? `（${i.impactNote}）` : ''}`]);
   }
   return rows;
@@ -465,8 +465,8 @@ export function changeNotesText(an: Analysis): string {
   lines.push('');
   lines.push('一、部门提成：原表 → 重算');
   for (const c of an.cm) {
-    const d = c.original === null ? null : c.primary.final - c.original;
-    lines.push(`  ${c.company}${c.month}月：原表 ${c.original === null ? '—' : c.original.toFixed(2)} → 重算 ${c.primary.final.toFixed(2)}${d !== null && Math.abs(d) >= 0.005 ? `（${d > 0 ? '+' : ''}${d.toFixed(2)}）` : ''}${c.primary.pendingUnit.length ? `，待补：${c.primary.pendingUnit.map((l) => l.model).join('、')}` : ''}`);
+    const d = c.primary.final - c.original;
+    lines.push(`  ${c.company}${c.month}月：原表 ${c.hasOriginal ? c.original.toFixed(2) : '未列'} → 重算 ${c.primary.final.toFixed(2)}${Math.abs(d) >= 0.005 ? `（${d > 0 ? '+' : ''}${d.toFixed(2)}）` : ''}${c.primary.pendingUnit.length ? `，待补：${c.primary.pendingUnit.map((l) => l.model).join('、')}` : ''}`);
   }
   lines.push('');
   lines.push('二、差异来源（非零步骤）');

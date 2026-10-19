@@ -15,7 +15,7 @@ export function parseRangeText(raw: unknown, tier: Tier, isFirst: boolean, isLas
   const n = typeof raw === 'number' ? raw : toNumber(raw);
   if (n !== null) {
     if (isFirst) return { ...base, lo: null, hi: n, loInclusive: false, hiInclusive: false, formatNote: `只写了数字 ${n}，按“<${n}”理解` };
-    if (isLast) return { ...base, lo: n, hi: null, loInclusive: false, hiInclusive: false, formatNote: `只写了数字 ${n}，按“>${n}”理解` };
+    if (isLast) return { ...base, lo: n, hi: null, loInclusive: true, hiInclusive: false, formatNote: `只写了数字 ${n}，按“≥${n}”（下限）理解` };
     return { ...base, lo: n, hi: null, loInclusive: true, hiInclusive: false, formatNote: `只写了数字 ${n}，按下限理解` };
   }
   const t = normText(raw).replace(/\s+/g, '').replace(/＜/g, '<').replace(/＞/g, '>');
@@ -56,6 +56,14 @@ export function parseTierRow(input: {
     const m = normText(e).match(/^(.+?)(?:型号)?除外$/);
     if (m) exceptions.push(...m[1].split(/[、,，/\s]+/).filter(Boolean));
   }
+  // 中间档只写了下限数字时，上限取下一档下限（不含），避免与更高档重叠
+  ranges.forEach((r, i) => {
+    const next = ranges[i + 1];
+    if (r.formatNote && r.hi === null && r.lo !== null && next?.lo != null) {
+      r.hi = next.lo;
+      r.hiInclusive = !next.loInclusive;
+    }
+  });
   const table: TierTable = { company, month, label, unmodified, ranges, lowerBounds: {}, exceptions, sheet, row };
   table.lowerBounds = lowerBounds(table);
   return table;

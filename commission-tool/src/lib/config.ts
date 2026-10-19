@@ -1,4 +1,5 @@
 // 规则配置：默认值、JSON 导入校验、本地保存。
+import { cleanMerges } from './calc';
 import type { CompletionMode, PriceBasis, QtyBasis, RuleConfig } from './types';
 
 export const STORAGE_KEY = 'commission-checker.rules.v1';
@@ -26,15 +27,35 @@ function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
-function numRecord(v: unknown): Record<string, number> {
+/** 补录数值：只收非负数，其余丢弃并记录 */
+function numRecord(v: unknown, label: string, notes: string[]): Record<string, number> {
   const out: Record<string, number> = {};
   if (v && typeof v === 'object') {
     for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
       const n = num(x);
-      if (n !== null) out[k] = n;
+      if (n !== null && n >= 0) out[k] = n;
+      else notes.push(`补录${label}“${k}”的值 ${JSON.stringify(x)} 无效（应为非负数），已忽略`);
     }
   }
   return out;
+}
+
+/** 完成率：小数；大于 5 视为百分数自动换算，负数无效 */
+function rateValue(v: unknown, where: string, notes: string[]): number | null {
+  const n = num(v);
+  if (n === null) {
+    if (v !== null && v !== undefined) notes.push(`${where} 不是数字，已忽略`);
+    return null;
+  }
+  if (n < 0) {
+    notes.push(`${where} 为负数，已忽略`);
+    return null;
+  }
+  if (n > 5) {
+    notes.push(`${where} = ${n} 按百分数换算为 ${n / 100}`);
+    return n / 100;
+  }
+  return n;
 }
 
 /** 校验并补全外部 JSON；返回配置与提示信息（未知字段忽略，非法值回退默认） */
@@ -53,22 +74,28 @@ export function normalizeConfig(input: unknown): { config: RuleConfig; notes: st
   const c = o.completion as Record<string, unknown> | undefined;
   if (c && typeof c === 'object') {
     if (MODES.includes(c.mode as CompletionMode)) d.completion.mode = c.mode as CompletionMode;
+    else if (c.mode !== undefined) notes.push(`完成系数 mode“${String(c.mode)}”无效，使用“none”`);
     const full = num(c.full);
     const floor = num(c.floor);
     if (full !== null && full > 0 && full <= 2) d.completion.full = full;
+    else if (c.full !== undefined) notes.push(`完成系数上限 ${String(c.full)} 无效（应在 0–2 之间的小数），使用 0.8`);
     if (floor !== null && floor >= 0 && floor <= d.completion.full) d.completion.floor = floor;
+    else if (c.floor !== undefined) notes.push(`完成系数下限 ${String(c.floor)} 无效（应在 0 与上限之间），使用 0.5`);
     if (c.perCompany && typeof c.perCompany === 'object') {
       for (const [k, v] of Object.entries(c.perCompany as Record<string, unknown>)) {
         const x = (v ?? {}) as Record<string, unknown>;
-        d.completion.perCompany[k] = { volumeRate: num(x.volumeRate), amountRate: num(x.amountRate) };
+        d.completion.perCompany[k] = { volumeRate: rateValue(x.volumeRate, `${k} 销量完成率`, notes), amountRate: rateValue(x.amountRate, `${k} 金额完成率`, notes) };
       }
     }
   }
   if (typeof o.premiumNeedsTarget === 'boolean') d.premiumNeedsTarget = o.premiumNeedsTarget;
   if (Array.isArray(o.personMerge)) {
-    d.personMerge = o.personMerge
+    const list = o.personMerge
       .filter((x): x is { from: string; to: string } => !!x && typeof x === 'object' && typeof (x as { from?: unknown }).from === 'string' && typeof (x as { to?: unknown }).to === 'string')
       .map((x) => ({ from: x.from, to: x.to }));
+    const { list: kept, dropped } = cleanMerges(list);
+    d.personMerge = kept;
+    if (dropped.length) notes.push(`人员合并中 ${dropped.map((m) => `${m.from}→${m.to}`).join('、')} 与后面的设置重复或形成循环，已忽略`);
   }
   if (Array.isArray(o.relatedCustomers)) d.relatedCustomers = o.relatedCustomers.filter((x): x is string => typeof x === 'string');
   if (o.missingUnitPrice !== undefined && o.missingUnitPrice !== 'pending') {
@@ -76,8 +103,8 @@ export function normalizeConfig(input: unknown): { config: RuleConfig; notes: st
   }
   const s = o.supplements as Record<string, unknown> | undefined;
   if (s && typeof s === 'object') {
-    d.supplements.unitPrice = numRecord(s.unitPrice);
-    d.supplements.domesticAvg = numRecord(s.domesticAvg);
+    d.supplements.unitPrice = numRecord(s.unitPrice, '单价', notes);
+    d.supplements.domesticAvg = numRecord(s.domesticAvg, '内贸均价', notes);
     if (s.paid && typeof s.paid === 'object') {
       for (const [k, v] of Object.entries(s.paid as Record<string, unknown>)) {
         if (typeof v === 'boolean') d.supplements.paid[k] = v;

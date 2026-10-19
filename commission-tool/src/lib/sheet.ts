@@ -88,12 +88,14 @@ export interface FormulaRef {
   row: number;
   c: number;
   r: number;
+  /** 行号前有 $（绝对引用），如 $M$1 */
+  rowAbs: boolean;
   /** 区域终点（如 SUM(G19:G23)） */
   end?: { col: string; row: number; c: number; r: number };
 }
 
 const REF_RE =
-  /(?:(?:'((?:[^']|'')+)'|([A-Za-z0-9_.一-鿿]+))!)?\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?/g;
+  /(?:(?:'((?:[^']|'')+)'|([A-Za-z0-9_.一-鿿]+))!)?\$?([A-Z]{1,3})(\$?)(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?/g;
 
 /** 取公式中的单元格引用（忽略字符串常量与函数名） */
 export function parseRefs(formula: string): FormulaRef[] {
@@ -102,7 +104,7 @@ export function parseRefs(formula: string): FormulaRef[] {
   REF_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = REF_RE.exec(src))) {
-    const [whole, quoted, bare, col, row, col2, row2] = m;
+    const [whole, quoted, bare, col, rowDollar, row, col2, row2] = m;
     const before = src[m.index - 1];
     const after = src[m.index + whole.length];
     // LOG10( 这类函数名、或标识符中间的片段，不是单元格引用
@@ -116,6 +118,7 @@ export function parseRefs(formula: string): FormulaRef[] {
       row: Number(row),
       c: colIndex(col),
       r: Number(row) - 1,
+      rowAbs: rowDollar === '$',
     };
     if (col2 && row2) ref.end = { col: col2, row: Number(row2), c: colIndex(col2), r: Number(row2) - 1 };
     out.push(ref);

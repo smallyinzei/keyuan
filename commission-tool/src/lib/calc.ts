@@ -1,7 +1,7 @@
 // 计算：部门提成 = Σ(数量×单价) + Σ溢价，溢价 = (外贸均价 − 内贸均价) × 10% × 数量；
 // 个人贡献按 人×月×型号 汇总；两种口径对比；原表 → 重算 → Σ个人 的差额拆解。
 import { normCustomer, normText } from './text';
-import { PREMIUM_RATE, type Order, type ParsedWorkbook, type PriceBasis, type QtyBasis, type RuleConfig, type Standard } from './types';
+import { PREMIUM_RATE, type CalcRow, type Order, type ParsedWorkbook, type PriceBasis, type QtyBasis, type RuleConfig, type Standard } from './types';
 
 export interface Basis {
   qty: QtyBasis;
@@ -50,6 +50,8 @@ export interface CoefInfo {
   /** 作用于溢价部分（溢价需达成目标时等于 unit，否则为 1） */
   premium: number;
   missing: boolean;
+  /** 完成率数值异常的说明（如按百分数填写已自动换算） */
+  note: string;
 }
 
 export function completionFactor(rate: number, full: number, floor: number): number {
@@ -63,17 +65,26 @@ export function coefficients(pw: ParsedWorkbook, cfg: RuleConfig): Record<string
   for (const company of pw.companies) {
     const mode = cfg.completion.mode;
     if (mode === 'none') {
-      out[company] = { company, mode, rate: null, rateSource: '无', unit: 1, premium: 1, missing: false };
+      out[company] = { company, mode, rate: null, rateSource: '无', unit: 1, premium: 1, missing: false, note: '' };
       continue;
     }
     const manual = cfg.completion.perCompany[company];
     const sheet = pw.completion.find((c) => c.company === company);
     const manualRate = mode === 'volume' ? manual?.volumeRate : manual?.amountRate;
     const sheetRate = mode === 'volume' ? sheet?.volumeRate : sheet?.amountRate;
-    const rate = manualRate ?? sheetRate ?? null;
+    let rate = manualRate ?? sheetRate ?? null;
     const rateSource: CoefInfo['rateSource'] = manualRate != null ? '配置' : sheetRate != null ? '表内' : '无';
+    let note = '';
+    // 完成率应为小数；大于 5 视为按百分数填写（如 71.26），负数视为无效
+    if (rate !== null && rate > 5) {
+      note = `完成率 ${rate} 按百分数换算为 ${(rate / 100).toFixed(4)}`;
+      rate = rate / 100;
+    } else if (rate !== null && rate < 0) {
+      note = `完成率 ${rate} 为负数，视为缺数据`;
+      rate = null;
+    }
     const k = rate === null ? 1 : completionFactor(rate, cfg.completion.full, cfg.completion.floor);
-    out[company] = { company, mode, rate, rateSource, unit: k, premium: cfg.premiumNeedsTarget ? k : 1, missing: rate === null };
+    out[company] = { company, mode, rate, rateSource, unit: k, premium: cfg.premiumNeedsTarget ? k : 1, missing: rate === null, note };
   }
   return out;
 }
@@ -118,6 +129,21 @@ export interface Line {
   paidUnknown: number;
 }
 
+/** 提成计算表一行应有的提成合计：单价 × 数量 + 溢价；本行填了完成系数时按“溢价是否需达成目标”计入（空单价按 Excel 习惯视为 0，仅用于核对公式） */
+export function rowTotal(r: CalcRow, premiumNeedsTarget = false): number {
+  const unit = (r.unitPrice ?? 0) * (r.qty ?? 0);
+  const prem = r.premium ?? 0;
+  if (r.coef === null) return unit + prem;
+  return premiumNeedsTarget ? (unit + prem) * r.coef : unit * r.coef + prem;
+}
+
+/** 提成合计可接受的几种写法（有完成系数时：不乘系数 / 整体乘系数 / 只单价部分乘系数） */
+export function rowTotalCandidates(r: CalcRow): number[] {
+  const unit = (r.unitPrice ?? 0) * (r.qty ?? 0);
+  const prem = r.premium ?? 0;
+  return r.coef === null ? [unit + prem] : [unit + prem, (unit + prem) * r.coef, unit * r.coef + prem];
+}
+
 export function stdKey(company: string, month: number, modelKeyText: string): string {
   return `${company}|${month}|${modelKeyText}`;
 }
@@ -128,13 +154,42 @@ export function indexStandards(pw: ParsedWorkbook): Map<string, Standard> {
   return m;
 }
 
+/** 规整人员合并：同一人只保留最后一条；会形成循环（A→B 且 B→A）的旧映射丢弃，后添加的优先 */
+export function cleanMerges(merge: RuleConfig['personMerge']): { list: RuleConfig['personMerge']; dropped: RuleConfig['personMerge'] } {
+  const accepted = new Map<string, string>();
+  const dropped: RuleConfig['personMerge'] = [];
+  for (let i = merge.length - 1; i >= 0; i--) {
+    const f = normText(merge[i].from);
+    const t = normText(merge[i].to);
+    if (!f || !t || f === t || accepted.has(f)) {
+      dropped.push(merge[i]);
+      continue;
+    }
+    let cur = t;
+    let cyclic = false;
+    const seen = new Set<string>([t]);
+    while (accepted.has(cur)) {
+      cur = accepted.get(cur)!;
+      if (cur === f) {
+        cyclic = true;
+        break;
+      }
+      if (seen.has(cur)) break;
+      seen.add(cur);
+    }
+    if (cyclic || cur === f) {
+      dropped.push(merge[i]);
+      continue;
+    }
+    accepted.set(f, t);
+  }
+  const list = merge.filter((m) => accepted.get(normText(m.from)) === normText(m.to) && !dropped.includes(m));
+  return { list, dropped };
+}
+
 export function buildPersonMap(merge: RuleConfig['personMerge']): Map<string, string> {
   const raw = new Map<string, string>();
-  for (const { from, to } of merge) {
-    const f = normText(from);
-    const t = normText(to);
-    if (f && t && f !== t) raw.set(f, t);
-  }
+  for (const { from, to } of cleanMerges(merge).list) raw.set(normText(from), normText(to));
   const resolved = new Map<string, string>();
   for (const f of raw.keys()) {
     let cur = f;
@@ -203,12 +258,16 @@ export function computeLines(pw: ParsedWorkbook, settings: CalcSettings, level: 
     let amountShipped = 0;
     let qty = 0;
     let paidUnknown = 0;
+    let missC = 0;
+    let missS = 0;
     const notes = new Set<string>();
     for (const o of g.orders) {
       contractQty += o.contractQty;
       shippedQty += o.shipped;
       amountContract += o.contractQty * o.netPrice;
       amountShipped += o.shipped * o.netPrice;
+      if (o.priceMissing && o.contractQty > 0) missC++;
+      if (o.priceMissing && o.shipped > 0) missS++;
       const q = qtyOf(o, settings.basis.qty, settings.supplements);
       qty += q.qty;
       if (q.unknownPaid) paidUnknown++;
@@ -217,21 +276,24 @@ export function computeLines(pw: ParsedWorkbook, settings: CalcSettings, level: 
     let avg: number | null = null;
     let avgNote = '';
     if (settings.basis.price === 'contract') {
-      avg = contractQty > 0 ? amountContract / contractQty : null;
+      avg = contractQty > 0 && !missC ? amountContract / contractQty : null;
+      if (missC) avgNote = `${missC} 笔订单缺含税单价，均价待补`;
     } else if (shippedQty > 0) {
-      avg = amountShipped / shippedQty;
+      avg = !missS ? amountShipped / shippedQty : null;
+      if (missS) avgNote = `${missS} 笔出库缺含税单价，均价待补`;
     } else if (contractQty > 0) {
-      avg = amountContract / contractQty;
-      avgNote = '无出库，均价按合同均价';
+      avg = !missC ? amountContract / contractQty : null;
+      avgNote = missC ? `${missC} 笔订单缺含税单价，均价待补` : '无出库，均价按合同均价';
     }
     const supUnit = settings.useSupplements ? settings.supplements.unitPrice[sk] : undefined;
     const supDom = settings.useSupplements ? settings.supplements.domesticAvg[sk] : undefined;
     const tableUnit = std?.unitPrice ?? null;
     const tableDom = std?.domesticAvg ?? null;
-    const unitPrice = typeof supUnit === 'number' ? supUnit : tableUnit;
-    const unitSource: Line['unitSource'] = typeof supUnit === 'number' ? '补录' : tableUnit !== null ? '表内' : '缺失';
-    const domestic = typeof supDom === 'number' ? supDom : tableDom;
-    const domSource: Line['domSource'] = typeof supDom === 'number' ? '补录' : tableDom !== null ? '表内' : '缺失';
+    // 补录只填补表内缺失的值，不覆盖表内已有数值
+    const unitPrice = tableUnit ?? (typeof supUnit === 'number' ? supUnit : null);
+    const unitSource: Line['unitSource'] = tableUnit !== null ? '表内' : typeof supUnit === 'number' ? '补录' : '缺失';
+    const domestic = tableDom ?? (typeof supDom === 'number' ? supDom : null);
+    const domSource: Line['domSource'] = tableDom !== null ? '表内' : typeof supDom === 'number' ? '补录' : '缺失';
     const unitComm = qty === 0 ? 0 : unitPrice === null ? null : qty * unitPrice;
     const premium = qty === 0 ? 0 : avg === null || domestic === null ? null : (avg - domestic) * PREMIUM_RATE * qty;
     if (paidUnknown) notes.add(`${paidUnknown} 笔出库缺回款信息，未计入`);
@@ -284,6 +346,8 @@ export interface Totals {
   final: number;
   pendingUnit: Line[];
   pendingPremium: Line[];
+  /** 出库且回款口径下缺回款信息、未计入的出库笔数 */
+  paidUnknown: number;
 }
 
 export function sumLines(lines: Line[], coef?: { unit: number; premium: number }): Totals {
@@ -294,14 +358,16 @@ export function sumLines(lines: Line[], coef?: { unit: number; premium: number }
   let premium = 0;
   const pendingUnit: Line[] = [];
   const pendingPremium: Line[] = [];
+  let paidUnknown = 0;
   for (const l of lines) {
     qty += l.qty;
+    paidUnknown += l.paidUnknown;
     if (l.unitComm === null) pendingUnit.push(l);
     else unitComm += l.unitComm;
     if (l.premium === null) pendingPremium.push(l);
     else premium += l.premium;
   }
-  return { qty, unitComm, premium, raw: unitComm + premium, coefUnit: cu, coefPremium: cp, final: unitComm * cu + premium * cp, pendingUnit, pendingPremium };
+  return { qty, unitComm, premium, raw: unitComm + premium, coefUnit: cu, coefPremium: cp, final: unitComm * cu + premium * cp, pendingUnit, pendingPremium, paidUnknown };
 }
 
 export function settingsFor(cfg: RuleConfig, basis: Basis, over: Partial<CalcSettings> = {}): CalcSettings {
@@ -391,7 +457,14 @@ export function waterfall(pw: ParsedWorkbook, cfg: RuleConfig, coefs: Record<str
   };
   const excluded = excludedSet(cfg);
   const variants: { key: string; label: string; explain: string; settings: CalcSettings; level: 'dept' | 'person'; coef: boolean }[] = [
-    { key: 'resum', label: '按明细重算（原表口径）', explain: '用订单明细重算各型号实发数量与合同加权均价，单价、内贸均价沿用原表', settings: base, level: 'dept', coef: false },
+    {
+      key: 'resum',
+      label: '按明细重算（原表口径）',
+      explain: `用订单明细重算各型号实发数量与合同加权均价，单价、内贸均价沿用原表${pw.calcRows.some((r) => r.coef !== null) ? '；原表“完成系数”列有值，此步起不再沿用，系数在“完成系数”一步按规则重新计入' : ''}`,
+      settings: base,
+      level: 'dept',
+      coef: false,
+    },
     { key: 'missing', label: '补列漏项型号', explain: '有实发但未进提成计算表的型号：计入溢价，单价部分待补', settings: { ...base, restrictToCalcModels: false }, level: 'dept', coef: false },
     { key: 'exclude', label: '剔除关联公司', explain: '按“关联公司剔除名单”去掉相应订单', settings: { ...base, restrictToCalcModels: false, excluded }, level: 'dept', coef: false },
     { key: 'supplement', label: '补录单价/内贸均价', explain: '使用规则配置中补录的提成单价、内贸均价', settings: { ...base, restrictToCalcModels: false, excluded, useSupplements: true }, level: 'dept', coef: false },
@@ -429,7 +502,8 @@ export function waterfall(pw: ParsedWorkbook, cfg: RuleConfig, coefs: Record<str
     let fix = 0;
     for (const r of calc) {
       orig += r.total ?? 0;
-      const f = (r.unitPrice ?? 0) * (r.qty ?? 0) + (r.premium ?? 0);
+      // 提成合计已符合某种合理写法（含本行完成系数）时保持不变；否则按本行数据重算
+      const f = r.total !== null && rowTotalCandidates(r).some((v) => Math.abs(v - r.total!) <= 0.01) ? r.total : rowTotal(r, cfg.premiumNeedsTarget);
       fix += f;
       origByModel.set(r.modelKey, { model: r.model, v: (origByModel.get(r.modelKey)?.v ?? 0) + (r.total ?? 0) });
       fixByModel.set(r.modelKey, { model: r.model, v: (fixByModel.get(r.modelKey)?.v ?? 0) + f });
@@ -451,7 +525,8 @@ export function waterfall(pw: ParsedWorkbook, cfg: RuleConfig, coefs: Record<str
     const pending: string[] = [];
     for (const l of finalDept) {
       if (l.unitComm === null) pending.push(`${l.model} 单价待补（数量 ${l.qty.toFixed(2)}）`);
-      if (l.premium === null) pending.push(`${l.model} 溢价无法计算（${l.domestic === null ? '缺内贸均价' : '缺外贸均价'}）`);
+      if (l.premium === null) pending.push(`${l.model} 溢价无法计算（${l.domestic === null ? '缺内贸均价' : l.avgNote || '缺外贸均价'}）`);
+      if (l.paidUnknown) pending.push(`${l.model} ${l.paidUnknown} 笔出库缺回款信息，未计入`);
     }
     rows.push({ company, month, steps, pending });
   }

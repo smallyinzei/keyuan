@@ -89,13 +89,13 @@ export function OverviewTab({ an, goto }: { an: Analysis; goto: (tab: string) =>
                         )}
                         <td>{c.month}月</td>
                         <td class="r">
-                          <Money v={c.original} />
+                          {c.hasOriginal ? <Money v={c.original} /> : <span class="muted" title="提成计算表没有该月，按 0 计">未列</span>}
                         </td>
                         <td class="r">
                           <Money v={c.primary.final} />
                         </td>
                         <td class="r">
-                          <Delta v={c.original === null ? null : c.primary.final - c.original} />
+                          <Delta v={c.primary.final - c.original} />
                         </td>
                         <td class="r">
                           <Money v={c.comparison.final} />
@@ -114,7 +114,21 @@ export function OverviewTab({ an, goto }: { an: Analysis; goto: (tab: string) =>
                         <td class="r">
                           <Delta v={c.personPrimary.final - c.primary.final} />
                         </td>
-                        <td class="small">{c.primary.pendingUnit.length ? <span class="pending">{c.primary.pendingUnit.map((l) => l.model).join('、')}</span> : <span class="muted">—</span>}</td>
+                        <td class="small">
+                          {c.primary.pendingUnit.length || c.primary.pendingPremium.length || c.primary.paidUnknown ? (
+                            <span class="pending">
+                              {[
+                                c.primary.pendingUnit.length ? `单价：${c.primary.pendingUnit.map((l) => l.model).join('、')}` : '',
+                                c.primary.pendingPremium.length ? `溢价：${c.primary.pendingPremium.map((l) => l.model).join('、')}` : '',
+                                c.primary.paidUnknown ? `缺回款 ${c.primary.paidUnknown} 笔` : '',
+                              ]
+                                .filter(Boolean)
+                                .join('；')}
+                            </span>
+                          ) : (
+                            <span class="muted">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                     <tr class="subtotal">
@@ -126,7 +140,7 @@ export function OverviewTab({ an, goto }: { an: Analysis; goto: (tab: string) =>
                         <Money v={sum(rows, (c) => c.primary.final)} />
                       </td>
                       <td class="r">
-                        <Delta v={sum(rows, (c) => (c.original === null ? null : c.primary.final - c.original))} />
+                        <Delta v={sum(rows, (c) => c.primary.final - c.original)} />
                       </td>
                       <td class="r">
                         <Money v={sum(rows, (c) => c.comparison.final)} />

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'preact/hooks';
 import { pendingItems, type Analysis } from '../lib/analysis';
-import { basisLabel, comparisonBasis, completionFactor, paidQtyOf } from '../lib/calc';
+import { basisLabel, cleanMerges, comparisonBasis, completionFactor, paidQtyOf } from '../lib/calc';
 import { defaultConfig, normalizeConfig } from '../lib/config';
 import { pct, qty as fmtQty } from '../lib/format';
 import { normCustomer, normText } from '../lib/text';
@@ -262,7 +262,8 @@ function PersonMergeCard({ an, cfg, set }: { an: Analysis; cfg: RuleConfig; set:
           class="btn small primary"
           disabled={!from || !normText(to) || from === normText(to)}
           onClick={() => {
-            set((c) => ({ ...c, personMerge: [...c.personMerge.filter((m) => normText(m.from) !== from), { from, to: normText(to) }] }));
+            // 新设置优先：同一人旧的合并、以及与之形成循环的反向合并一并去掉
+            set((c) => ({ ...c, personMerge: cleanMerges([...c.personMerge, { from, to: normText(to) }]).list }));
             setFrom('');
             setTo('');
           }}
@@ -370,8 +371,33 @@ function RelatedCard({ an, cfg, set }: { an: Analysis; cfg: RuleConfig; set: Set
 
 function PendingCard({ an, cfg, set }: { an: Analysis; cfg: RuleConfig; set: SetCfg }) {
   const items = pendingItems(an);
+  const used = new Set(items.map((p) => p.key));
+  const unused = [...Object.keys(cfg.supplements.unitPrice), ...Object.keys(cfg.supplements.domesticAvg)].filter((k) => !used.has(k));
   return (
-    <Card title="待补单价 / 内贸均价" sub="提成计算表缺单价的型号在此补录；留空即保持“待补”，不会按 0 计算。补录值随规则 JSON 一起保存。">
+    <Card title="待补单价 / 内贸均价" sub="提成计算表缺单价的型号在此补录；留空即保持“待补”，不会按 0 计算。补录只填补缺失值，不覆盖表内已有数值；随规则 JSON 一起保存。">
+      {unused.length > 0 && (
+        <p class="small pending-note">
+          规则中有 {unused.length} 条补录不适用于本文件（{unused.slice(0, 4).join('、')}
+          {unused.length > 4 ? ' 等' : ''}），不会生效。
+          <button
+            type="button"
+            class="btn link"
+            onClick={() =>
+              set((c) => {
+                const u = { ...c.supplements.unitPrice };
+                const d = { ...c.supplements.domesticAvg };
+                for (const k of unused) {
+                  delete u[k];
+                  delete d[k];
+                }
+                return { ...c, supplements: { ...c.supplements, unitPrice: u, domesticAvg: d } };
+              })
+            }
+          >
+            清除这些补录
+          </button>
+        </p>
+      )}
       {items.length ? (
         <TableWrap>
           <table class="grid compact">

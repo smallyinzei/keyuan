@@ -24,8 +24,9 @@ export interface Order {
   /** 型号归一键（大写、去空格），用于与汇总、提成计算表匹配 */
   modelKey: string;
   contractQty: number;
-  /** 含税单价 */
+  /** 含税单价（缺失时为 0，并以 priceMissing 标记，计算时均价按待补处理，不按 0 计算） */
   price: number;
+  priceMissing: boolean;
   /** 运费（每吨） */
   freight: number;
   /** 出厂单价 = 含税单价 − 运费 */
@@ -217,6 +218,8 @@ export interface ParsedWorkbook {
   warnings: ParseWarning[];
   /** sheet → 行号(1 起) → 行角色 */
   rowRoles: Record<string, Record<number, RowRole>>;
+  /** 同一公司同月同型号出现多次的汇总行 / 提成计算行 */
+  duplicates: { kind: 'summary' | 'calc'; company: string; month: number; model: string; sheet: string; rows: number[]; conflict: string[] }[];
   /** 提成计算表“合计”行的位置 */
   calcTotalRows: { company: string; sheet: string; row: number; total: number | null; addr: string }[];
   /** 明细表汇总块“合计”行 */
@@ -277,4 +280,6 @@ export interface Issue {
   impactNote: string;
   message: string;
   suggestion: string;
+  /** 是否已体现在工具的重算结果中（修改说明据此区分“重算已采用 / 待确认”） */
+  adopted: boolean;
 }

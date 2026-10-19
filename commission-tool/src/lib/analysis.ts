@@ -21,7 +21,9 @@ import type { Issue, ParsedWorkbook, RuleConfig } from './types';
 export interface CmSummary {
   company: string;
   month: number;
-  original: number | null;
+  /** 原表提成合计（该月提成计算表没有行时为 0，见 hasOriginal） */
+  original: number;
+  hasOriginal: boolean;
   primary: Totals;
   comparison: Totals;
   personPrimary: Totals;
@@ -92,7 +94,8 @@ export function analyze(pw: ParsedWorkbook, cfg: RuleConfig): Analysis {
       return {
         company,
         month,
-        original: orig.has(k) ? orig.get(k)! : null,
+        original: orig.get(k) ?? 0,
+        hasOriginal: orig.has(k),
         primary: sumLines(pd.get(k) ?? [], coefs[company]),
         comparison: sumLines(cd.get(k) ?? [], coefs[company]),
         personPrimary: sumLines(pp.get(k) ?? [], coefs[company]),

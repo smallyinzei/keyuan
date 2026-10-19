@@ -116,7 +116,7 @@ function parsePaid(
   col: number | undefined,
   header: string,
   shipped: number,
-  netPrice: number,
+  price: number,
 ): number | null {
   if (col === undefined) return null;
   const cell = grid.get(r, col);
@@ -124,7 +124,8 @@ function parsePaid(
   const n = toNumber(cell.v);
   const h = normHeader(header);
   if (n !== null && h.includes('数量')) return Math.max(0, Math.min(shipped, n));
-  if (n !== null && h.includes('金额')) return netPrice > 0 ? Math.max(0, Math.min(shipped, n / netPrice)) : null;
+  // 回款金额按含税单价折算吨数
+  if (n !== null && h.includes('金额')) return price > 0 ? Math.max(0, Math.min(shipped, n / price)) : null;
   const t = normText(cell.v).toUpperCase();
   if (PAID_TRUE.has(t) || cell.t === 'd' || (n !== null && n > 0 && h.includes('日期'))) return shipped;
   if (['否', '未回款', '未收', 'N', 'NO', '×', 'FALSE', '0'].includes(t)) return 0;
@@ -138,6 +139,7 @@ function parseDetail(grid: SheetGrid, company: string, ctx: Ctx, orders: Order[]
   let summaryCols: ColMap<SummaryField> | null = null;
   let summaryModelCol: number | undefined;
   let mode: 'idle' | 'orders' | 'summary' = 'idle';
+  let headerReused = false;
   const occurrences = new Map<string, number>();
   const pendingNoMonth: Order[] = [];
 
@@ -149,7 +151,9 @@ function parseDetail(grid: SheetGrid, company: string, ctx: Ctx, orders: Order[]
 
     if (cells.length <= 3 && stringCells.length && isMonthTitle(stringCells[0].v)) {
       month = parseMonth(stringCells[0].v);
-      mode = 'idle';
+      // 新月份块：若之后没有重复表头，沿用上一块的列位置
+      mode = orderCols ? 'orders' : 'idle';
+      headerReused = !!orderCols;
       continue;
     }
 
@@ -158,6 +162,7 @@ function parseDetail(grid: SheetGrid, company: string, ctx: Ctx, orders: Order[]
       orderCols = om;
       paidHeader = om.paid !== undefined ? normText(grid.get(r, om.paid)?.v) : '';
       mode = 'orders';
+      headerReused = false;
       continue;
     }
 
@@ -188,13 +193,25 @@ function parseDetail(grid: SheetGrid, company: string, ctx: Ctx, orders: Order[]
         }
         continue;
       }
+      if (headerReused) {
+        ctx.warnings.push({ level: 'info', message: `${company}${month ?? ''}月数据块没有重复表头，沿用上一块的列位置读取`, loc: { sheet: grid.name, addr: addr(r, 0) } });
+        headerReused = false;
+      }
       const freight = grid.num(r, oc.freight) ?? 0;
       let price = grid.num(r, oc.price);
+      let priceMissing = false;
       const netCell = grid.num(r, oc.netPrice);
-      if (price === null && netCell !== null) price = netCell + freight;
+      // 出厂单价若是由含税单价算出的公式（=E-F），不能用来反推含税单价
+      if (price === null && netCell !== null && !grid.formula(r, oc.netPrice)) {
+        price = netCell + freight;
+        ctx.warnings.push({ level: 'info', message: `${company}：第 ${rowNo} 行 ${model} 含税单价为空，按手填出厂单价 + 运费 = ${price} 读入`, loc: { sheet: grid.name, addr: addr(r, (oc.price ?? oc.netPrice) as number) } });
+      }
       if (price === null) {
-        ctx.warnings.push({ level: 'error', message: `${company}：第 ${rowNo} 行 ${model} 缺含税单价，按 0 读入，均价会失真`, loc: { sheet: grid.name, addr: addr(r, (oc.price ?? oc.netPrice ?? oc.model) as number) } });
+        priceMissing = true;
         price = 0;
+        ctx.warnings.push({ level: 'error', message: `${company}：第 ${rowNo} 行 ${model} 缺含税单价，该型号当月外贸均价与溢价标记待补（不按 0 计算）`, loc: { sheet: grid.name, addr: addr(r, (oc.price ?? oc.netPrice ?? oc.model) as number) } });
+      } else if (price === 0) {
+        ctx.warnings.push({ level: 'warn', message: `${company}：第 ${rowNo} 行 ${model} 含税单价为 0，请确认（会拉低外贸均价）`, loc: { sheet: grid.name, addr: addr(r, (oc.price ?? oc.model) as number) } });
       }
       let shipped = grid.num(r, oc.shipped);
       if (shipped === null) {
@@ -224,13 +241,14 @@ function parseDetail(grid: SheetGrid, company: string, ctx: Ctx, orders: Order[]
         modelKey: modelKey(model),
         contractQty: contractQty ?? 0,
         price,
+        priceMissing,
         freight,
         netPrice,
         shipped,
         unshippedRaw: unshippedNum ?? (unshippedText || null),
         customer: grid.text(r, oc.customer),
         contractNo,
-        paidQty: parsePaid(grid, r, oc.paid, paidHeader, shipped, netPrice),
+        paidQty: parsePaid(grid, r, oc.paid, paidHeader, shipped, price),
         sheet: grid.name,
         row: rowNo,
         cols: colsToLetters(oc),
@@ -320,6 +338,9 @@ function parseCalc(
       if (r <= headerRow) continue;
       const label = grid.text(r, monthCol);
       const model = grid.text(r, h.model);
+      // “七月合计”“小计”这类月小计行跳过；不带月份的“合计/总计”是全表合计，到此结束
+      const isSubtotal = (t: string) => /小计/.test(t) || (/合计/.test(t) && parseMonth(t) !== null);
+      if (isSubtotal(label) || isSubtotal(model)) continue;
       if (/合计|总计/.test(label) || /合计|总计/.test(model)) {
         calcTotalRows.push({ company, sheet: grid.name, row: r + 1, total: grid.num(r, h.total), addr: addr(r, h.total ?? 0) });
         break;
@@ -486,8 +507,15 @@ function parseCostSource(grid: SheetGrid, costSources: CostSource[]) {
   }
 }
 
-function buildStandards(summaries: SummaryRow[], calcRows: CalcRow[]): Standard[] {
+function buildStandards(summaries: SummaryRow[], calcRows: CalcRow[], duplicates: ParsedWorkbook['duplicates']): Standard[] {
   const map = new Map<string, Standard>();
+  const dup = (kind: 'summary' | 'calc', first: { company: string; month: number; model: string; sheet: string; row: number }, row: number, conflict: string[]) => {
+    let d = duplicates.find((x) => x.kind === kind && x.company === first.company && x.month === first.month && x.sheet === first.sheet && x.rows[0] === first.row);
+    if (!d) duplicates.push((d = { kind, company: first.company, month: first.month, model: first.model, sheet: first.sheet, rows: [first.row], conflict: [] }));
+    d.rows.push(row);
+    for (const c of conflict) if (!d.conflict.includes(c)) d.conflict.push(c);
+  };
+  const differs = (a: number | string | null, b: number | string | null) => (typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) > 1e-9 : a !== b);
   const get = (company: string, month: number, model: string, key: string) => {
     const k = `${company}|${month}|${key}`;
     let s = map.get(k);
@@ -499,11 +527,34 @@ function buildStandards(summaries: SummaryRow[], calcRows: CalcRow[]): Standard[
   };
   for (const s of summaries) {
     const st = get(s.company, s.month, s.model, s.modelKey);
+    if (st.summary) {
+      const conflict = differs(st.summary.domesticAvg, s.domesticAvg) ? ['内贸均价'] : [];
+      if (conflict.length) st.domesticAvg = null;
+      dup('summary', st.summary, s.row, conflict);
+      continue;
+    }
     st.summary = s;
     st.domesticAvg = s.domesticAvg;
   }
   for (const c of calcRows) {
     const st = get(c.company, c.month, c.model, c.modelKey);
+    if (st.calc) {
+      const conflict: string[] = [];
+      if (differs(st.calc.unitPrice, c.unitPrice)) {
+        conflict.push('提成单价');
+        st.unitPrice = null;
+      }
+      if (differs(st.calc.tier, c.tier)) {
+        conflict.push('档级');
+        st.tier = null;
+      }
+      if (differs(st.calc.varCost, c.varCost)) {
+        conflict.push('变动成本');
+        st.varCost = null;
+      }
+      dup('calc', st.calc, c.row, conflict);
+      continue;
+    }
     st.calc = c;
     st.varCost = c.varCost;
     st.tier = c.tier;
@@ -559,6 +610,7 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName: string): ParsedWorkbo
   const costSources: CostSource[] = [];
   const calcTotalRows: ParsedWorkbook['calcTotalRows'] = [];
   const summaryTotalRows: ParsedWorkbook['summaryTotalRows'] = [];
+  const duplicates: ParsedWorkbook['duplicates'] = [];
 
   for (const s of sheets) {
     const dGrid = new SheetGrid(s.detail, wb.Sheets[s.detail], sheetHidden(wb, s.detail));
@@ -581,7 +633,8 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName: string): ParsedWorkbo
     orders,
     summaries,
     calcRows,
-    standards: buildStandards(summaries, calcRows),
+    standards: buildStandards(summaries, calcRows, duplicates),
+    duplicates,
     tierTables,
     completion,
     costSources,
