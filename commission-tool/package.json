@@ -1,0 +1,26 @@
+{
+  "name": "commission-checker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "外贸提成测算与体检：离线单文件网页工具",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/release.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "vite build && vitest run tests/e2e.test.ts"
+  },
+  "dependencies": {
+    "exceljs": "4.4.0",
+    "preact": "10.29.8",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vite-plugin-singlefile": "2.3.4",
+    "vitest": "4.1.12"
+  }
+}

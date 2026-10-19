@@ -1,0 +1,107 @@
+// 规则配置：默认值、JSON 导入校验、本地保存。
+import type { CompletionMode, PriceBasis, QtyBasis, RuleConfig } from './types';
+
+export const STORAGE_KEY = 'commission-checker.rules.v1';
+
+export function defaultConfig(): RuleConfig {
+  return {
+    schema: 'commission-checker/rules',
+    version: 1,
+    qtyBasis: 'shipped',
+    priceBasis: 'contract',
+    completion: { mode: 'none', full: 0.8, floor: 0.5, perCompany: {} },
+    premiumNeedsTarget: false,
+    personMerge: [],
+    relatedCustomers: [],
+    missingUnitPrice: 'pending',
+    supplements: { unitPrice: {}, domesticAvg: {}, paid: {} },
+  };
+}
+
+const QTY: QtyBasis[] = ['contract', 'shipped', 'shippedPaid'];
+const PRICE: PriceBasis[] = ['contract', 'shipped'];
+const MODES: CompletionMode[] = ['none', 'volume', 'amount'];
+
+function num(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function numRecord(v: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (v && typeof v === 'object') {
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      const n = num(x);
+      if (n !== null) out[k] = n;
+    }
+  }
+  return out;
+}
+
+/** 校验并补全外部 JSON；返回配置与提示信息（未知字段忽略，非法值回退默认） */
+export function normalizeConfig(input: unknown): { config: RuleConfig; notes: string[] } {
+  const d = defaultConfig();
+  const notes: string[] = [];
+  if (!input || typeof input !== 'object') return { config: d, notes: ['不是有效的 JSON 对象，已使用默认规则'] };
+  const o = input as Record<string, unknown>;
+  if (o.schema !== undefined && o.schema !== d.schema) notes.push(`schema 为“${String(o.schema)}”，不是本工具导出的规则文件，已尽量读取`);
+
+  if (QTY.includes(o.qtyBasis as QtyBasis)) d.qtyBasis = o.qtyBasis as QtyBasis;
+  else if (o.qtyBasis !== undefined) notes.push(`qtyBasis“${String(o.qtyBasis)}”无效，使用默认“shipped”`);
+  if (PRICE.includes(o.priceBasis as PriceBasis)) d.priceBasis = o.priceBasis as PriceBasis;
+  else if (o.priceBasis !== undefined) notes.push(`priceBasis“${String(o.priceBasis)}”无效，使用默认“contract”`);
+
+  const c = o.completion as Record<string, unknown> | undefined;
+  if (c && typeof c === 'object') {
+    if (MODES.includes(c.mode as CompletionMode)) d.completion.mode = c.mode as CompletionMode;
+    const full = num(c.full);
+    const floor = num(c.floor);
+    if (full !== null && full > 0 && full <= 2) d.completion.full = full;
+    if (floor !== null && floor >= 0 && floor <= d.completion.full) d.completion.floor = floor;
+    if (c.perCompany && typeof c.perCompany === 'object') {
+      for (const [k, v] of Object.entries(c.perCompany as Record<string, unknown>)) {
+        const x = (v ?? {}) as Record<string, unknown>;
+        d.completion.perCompany[k] = { volumeRate: num(x.volumeRate), amountRate: num(x.amountRate) };
+      }
+    }
+  }
+  if (typeof o.premiumNeedsTarget === 'boolean') d.premiumNeedsTarget = o.premiumNeedsTarget;
+  if (Array.isArray(o.personMerge)) {
+    d.personMerge = o.personMerge
+      .filter((x): x is { from: string; to: string } => !!x && typeof x === 'object' && typeof (x as { from?: unknown }).from === 'string' && typeof (x as { to?: unknown }).to === 'string')
+      .map((x) => ({ from: x.from, to: x.to }));
+  }
+  if (Array.isArray(o.relatedCustomers)) d.relatedCustomers = o.relatedCustomers.filter((x): x is string => typeof x === 'string');
+  if (o.missingUnitPrice !== undefined && o.missingUnitPrice !== 'pending') {
+    notes.push('缺单价处理固定为“标记待补”，不允许按 0 计算');
+  }
+  const s = o.supplements as Record<string, unknown> | undefined;
+  if (s && typeof s === 'object') {
+    d.supplements.unitPrice = numRecord(s.unitPrice);
+    d.supplements.domesticAvg = numRecord(s.domesticAvg);
+    if (s.paid && typeof s.paid === 'object') {
+      for (const [k, v] of Object.entries(s.paid as Record<string, unknown>)) {
+        if (typeof v === 'boolean') d.supplements.paid[k] = v;
+        else if (num(v) !== null) d.supplements.paid[k] = v as number;
+      }
+    }
+  }
+  return { config: d, notes };
+}
+
+export function loadStoredConfig(): RuleConfig | null {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return normalizeConfig(JSON.parse(raw)).config;
+  } catch {
+    return null;
+  }
+}
+
+export function storeConfig(cfg: RuleConfig): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+  } catch {
+    // 隐私模式等无法写入时忽略；用户仍可导出 JSON
+  }
+}
